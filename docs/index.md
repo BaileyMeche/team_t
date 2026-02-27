@@ -1,6 +1,8 @@
 ---
 title: Home
 ---
+Project architecture for the LSTM draft workflow: [docs/ARCHITECTURE.md](/Users/assortedsphinx/Desktop/team_t/docs/ARCHITECTURE.md)
+
 # Treasury vs Synthetic Nominal Yield Carry Trade  
 ## Levered Relative-Value Arbitrage Strategy
 
