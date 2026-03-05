@@ -256,22 +256,20 @@ All status flags below are based on direct inspection of: [lstm.ipynb](/Users/as
 ## Stage 7 — Trading signal construction
 
 ### Stage Summary
-- Status: `PARTIALLY COMPLETE`
+- Status: `COMPLETE`
 - Purpose: map predictions into explicit trade signals and stance definition.
 
 ### Existing Implementation
-- Existing implementation (`PARTIALLY COMPLETE`): notebook states next-step return target and ranking intent in [lstm.ipynb](/Users/assortedsphinx/Desktop/team_t/notebooks/lstm.ipynb:31), [lstm.ipynb](/Users/assortedsphinx/Desktop/team_t/notebooks/lstm.ipynb:710), and target column in [lstm.ipynb](/Users/assortedsphinx/Desktop/team_t/notebooks/lstm.ipynb:290).
+- Existing implementation (`COMPLETE`): full signal construction pipeline implemented in [signal_construction.py](/src/signal_construction.py) with `validate_no_lookahead`, `rank_predictions_cross_sectionally` (volume tie-breaking), `build_long_short_signal_book`, `build_long_only_signal_book`, and `generate_signal_books` orchestrator. Notebook Stage 7 cell added to [lstm.ipynb](/notebooks/lstm.ipynb).
+- Existing implementation (`COMPLETE`): mock Stage 6 inputs generated at `data/signals/predictions_test_mock.csv` (251 dates × 10 tickers) and `data/signals/signal_diagnostics_mock.csv` for pipeline validation pending real Stage 6 outputs.
 
 ### Tasks to Implement
 - Tasks to implement (`NOT COMPLETE`):
-- formalize target as next-day log return for signal generation
-- formalize pooled training structure as primary model design
-- implement cross-sectional rank-to-signal function
-- implement both long-short and long-only signal books
-- define entry/exit and rebalance cadence in code
+- formalize pooled training structure as primary model design (deferred to Stage 4/5)
+- define entry/exit and rebalance cadence in code (deferred to Stage 8/9)
 
 ### Files Involved
-- Files involved: new `/Users/assortedsphinx/Desktop/team_t/src/signal_utils.py`, [lstm.ipynb](/Users/assortedsphinx/Desktop/team_t/notebooks/lstm.ipynb).
+- Files involved: [signal_construction.py](/src/signal_construction.py), [lstm.ipynb](/notebooks/lstm.ipynb).
 
 ### Outputs
 - Outputs: `signal_book_long_short.csv`, `signal_book_long_only.csv`.
@@ -322,7 +320,7 @@ Remaining work:
 
 Confirm this convention is propagated consistently through signal generation and backtest engine.
 
-### Cross-Sectional Ranking Rule — `NOT COMPLETE`
+### Cross-Sectional Ranking Rule — `COMPLETE`
 
 Daily signal generation procedure:
 1. For each trading day `t`, rank all assets by predicted return.
@@ -345,8 +343,8 @@ Baseline parameter:
 
 Sensitivity analysis will test `K ∈ {2,3,4}` in Stage 12.
 
-- `No Lookahead assertion (signal layer)` — `NOT COMPLETE`
-- Implementation rule: at signal date `t`, allowed columns must be derived only from dates `<= t`; forbid any use of `t+1` or later values in feature engineering.
+- `No Lookahead assertion (signal layer)` — `COMPLETE`
+- Implementation: `validate_no_lookahead` in [signal_construction.py](/src/signal_construction.py) hard-fails (`ValueError`) on any column matching forbidden exact names (`adj_close_intraday`, `adj_open`, `open_t1`, `close_t1`, `next_open`, `next_close`) or substrings (`_t1`, `_next`). Called as first step in `generate_signal_books`.
 - Reason: signals are frozen after close `t`, and `t+1` prices are used only for execution/PnL, never for feature construction.
 
 ### Stage 7 timing table (insert exactly)
@@ -633,7 +631,7 @@ Example: if strategy realized returns use `open(t+1) -> close(t+1)`, benchmark r
 - `src/model_utils.py`: model build/train/predict and walk-forward routines.
 - `src/prediction_utils.py`: standardized prediction table creation.
 - `src/signal_diagnostics.py`: IC/rank-IC/decile/spread/calibration/permutation/SHAP outputs.
-- `src/signal_utils.py`: rank-to-signal mapping for long-only and long-short.
+- `src/signal_construction.py`: rank-to-signal mapping for long-only and long-short (`COMPLETE`).
 - `src/portfolio_utils.py`: signals-to-positions conversion.
 - `src/backtest_utils.py`: replace placeholders with executable backtest/evaluation.
 - `src/cost_utils.py`: explicit cost/funding layer.
