@@ -8,6 +8,8 @@ import nasdaqdatalink
 import numpy as np
 import pandas as pd
 from dotenv import load_dotenv
+import wrds
+
 
 
 def configure_api_from_env(env_candidates: list[Path]) -> None:
@@ -338,13 +340,6 @@ def validate_point_in_time_panel(panel_df: pd.DataFrame) -> None:
     if not bool(ok.all()):
         raise AssertionError("Found lookahead leakage: feature_available_date > date")
 
-from __future__ import annotations
-
-import os
-from pathlib import Path
-
-from dotenv import load_dotenv
-import wrds
 
 
 def load_wrds_credentials(env_candidates: list[Path] | None = None) -> tuple[str, str]:
