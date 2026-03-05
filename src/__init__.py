@@ -15,3 +15,5 @@ from .feature_engineering import (
     build_lstm_tensors,
     compute_event_intensity_diagnostics,
 )
+
+from .wrds_utils import connect_wrds, load_wrds_credentials
