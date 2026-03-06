@@ -131,6 +131,239 @@ def add_price_liquidity_features(
     return out
 
 
+STAGE_1_BASELINE_FEATURE_COLS = [
+    "roe_change",
+    "margin_change",
+    "leverage_change",
+    "eps_growth",
+    "book_value_growth",
+    "log_return",
+    "rolling_beta",
+    "volume_ratio",
+]
+STAGE_2_DERIVED_FEATURE_COLS = [
+    "roe_change_accel",
+    "margin_change_accel",
+]
+STAGE_3_DERIVED_FEATURE_COLS = [
+    "eps_growth_surprise",
+]
+STAGE_4_DERIVED_FEATURE_COLS = [
+    "reaction_speed",
+]
+STAGE_5_DERIVED_FEATURE_COLS = [
+    "vol_regime_ratio_20_60",
+]
+_STAGE_FEATURE_MAP: dict[int, list[str]] = {
+    1: STAGE_1_BASELINE_FEATURE_COLS,
+    2: STAGE_2_DERIVED_FEATURE_COLS,
+    3: STAGE_3_DERIVED_FEATURE_COLS,
+    4: STAGE_4_DERIVED_FEATURE_COLS,
+    5: STAGE_5_DERIVED_FEATURE_COLS,
+}
+
+
+def get_stage_feature_columns(max_stage: int = 5) -> list[str]:
+    """Return cumulative feature columns through max_stage."""
+    if max_stage < 1 or max_stage > 5:
+        raise ValueError(f"max_stage must be between 1 and 5 inclusive; got {max_stage}")
+
+    cols: list[str] = []
+    for stage in range(1, max_stage + 1):
+        cols.extend(_STAGE_FEATURE_MAP[stage])
+    return cols
+
+
+def _build_report_level_feature_table(
+    panel_df: pd.DataFrame,
+    ticker_col: str,
+    feature_available_col: str,
+) -> pd.DataFrame:
+    base_cols = [ticker_col, feature_available_col, "roe_change", "margin_change", "eps_growth"]
+    missing = [col for col in base_cols if col not in panel_df.columns]
+    if missing:
+        raise KeyError(f"Missing columns required for report-level staged features: {missing}")
+
+    report = (
+        panel_df[base_cols]
+        .copy()
+        .dropna(subset=[ticker_col, feature_available_col])
+        .sort_values([ticker_col, feature_available_col])
+        # Keep first daily row in each availability regime so event-level
+        # change/surprise features update only when a new report becomes tradable.
+        .drop_duplicates([ticker_col, feature_available_col], keep="first")
+        .reset_index(drop=True)
+    )
+
+    for col in ["roe_change", "margin_change", "eps_growth"]:
+        report[col] = pd.to_numeric(report[col], errors="coerce")
+    report[feature_available_col] = pd.to_datetime(report[feature_available_col], errors="coerce")
+    return report
+
+
+def _merge_report_features_asof(
+    panel_df: pd.DataFrame,
+    report_df: pd.DataFrame,
+    feature_cols: list[str],
+    ticker_col: str,
+    date_col: str,
+    feature_available_col: str,
+) -> pd.DataFrame:
+    helper_event_col = "__report_event_date"
+    report_local = report_df.rename(columns={feature_available_col: helper_event_col}).copy()
+    merged_parts: list[pd.DataFrame] = []
+
+    for ticker, panel_ticker in panel_df.groupby(ticker_col, sort=False):
+        panel_ticker = panel_ticker.sort_values(date_col).copy()
+        report_ticker = report_local[report_local[ticker_col] == ticker].sort_values(helper_event_col).copy()
+
+        if report_ticker.empty:
+            for col in feature_cols:
+                panel_ticker[col] = np.nan
+            merged_parts.append(panel_ticker)
+            continue
+
+        merged = pd.merge_asof(
+            panel_ticker,
+            report_ticker[[helper_event_col, *feature_cols]],
+            left_on=date_col,
+            right_on=helper_event_col,
+            direction="backward",
+            allow_exact_matches=True,
+        )
+        merged = merged.drop(columns=[helper_event_col])
+        merged_parts.append(merged)
+
+    out = pd.concat(merged_parts, ignore_index=True)
+    out = out.sort_values([ticker_col, date_col]).reset_index(drop=True)
+    return out
+
+
+def add_staged_features(
+    panel_df: pd.DataFrame,
+    max_stage: int = 5,
+    ticker_col: str = "ticker",
+    date_col: str = "date",
+    feature_available_col: str = "feature_available_date",
+    price_col: str = "adj_close",
+    reaction_clip: tuple[float, float] = (-0.05, 0.05),
+    surprise_window: int = 8,
+    surprise_min_obs: int = 4,
+    vol_short_window: int = 20,
+    vol_short_min_obs: int = 20,
+    vol_long_window: int = 60,
+    vol_long_min_obs: int = 40,
+    vol_epsilon: float = 1e-8,
+) -> pd.DataFrame:
+    """Add cumulative staged features (Stages 2-5) to a PIT daily panel.
+
+    Stage-1 baseline features are expected to be computed separately and are not
+    modified here.
+    """
+    if max_stage < 1 or max_stage > 5:
+        raise ValueError(f"max_stage must be between 1 and 5 inclusive; got {max_stage}")
+    if ticker_col not in panel_df.columns or date_col not in panel_df.columns:
+        raise KeyError(f"panel_df must contain '{ticker_col}' and '{date_col}' columns")
+
+    out = panel_df.copy()
+    out[date_col] = pd.to_datetime(out[date_col], errors="coerce")
+    out = out.sort_values([ticker_col, date_col]).reset_index(drop=True)
+
+    if feature_available_col in out.columns:
+        out[feature_available_col] = pd.to_datetime(out[feature_available_col], errors="coerce")
+
+    if max_stage >= 2:
+        if feature_available_col not in out.columns:
+            raise KeyError(f"Missing required column for staged features: {feature_available_col}")
+
+        report = _build_report_level_feature_table(
+            panel_df=out,
+            ticker_col=ticker_col,
+            feature_available_col=feature_available_col,
+        )
+
+        report["roe_change_accel"] = report.groupby(ticker_col)["roe_change"].diff()
+        report["margin_change_accel"] = report.groupby(ticker_col)["margin_change"].diff()
+
+        if max_stage >= 3:
+            grp = report.groupby(ticker_col)["eps_growth"]
+            eps_mean = grp.transform(
+                lambda s: s.shift(1).rolling(window=surprise_window, min_periods=surprise_min_obs).mean()
+            )
+            eps_std = grp.transform(
+                lambda s: s.shift(1).rolling(window=surprise_window, min_periods=surprise_min_obs).std(ddof=0)
+            )
+            report["eps_growth_surprise"] = np.where(
+                eps_std.notna() & eps_std.ne(0),
+                (report["eps_growth"] - eps_mean) / eps_std,
+                np.nan,
+            )
+
+        event_cols: list[str] = []
+        if max_stage >= 2:
+            event_cols.extend(STAGE_2_DERIVED_FEATURE_COLS)
+        if max_stage >= 3:
+            event_cols.extend(STAGE_3_DERIVED_FEATURE_COLS)
+
+        out = _merge_report_features_asof(
+            panel_df=out,
+            report_df=report[[ticker_col, feature_available_col, *event_cols]].copy(),
+            feature_cols=event_cols,
+            ticker_col=ticker_col,
+            date_col=date_col,
+            feature_available_col=feature_available_col,
+        )
+
+    if max_stage >= 4:
+        if feature_available_col not in out.columns:
+            raise KeyError(f"Missing required column for reaction_speed: {feature_available_col}")
+        if price_col not in out.columns:
+            raise KeyError(f"Missing required column for reaction_speed: {price_col}")
+
+        out[price_col] = pd.to_numeric(out[price_col], errors="coerce")
+        out.loc[out[price_col] <= 0, price_col] = np.nan
+
+        fa_key = out[feature_available_col].fillna(pd.Timestamp("1900-01-01"))
+        out["regime_id"] = (
+            out.assign(_fa_key=fa_key)
+            .groupby(ticker_col)["_fa_key"]
+            .transform(lambda s: s.ne(s.shift()).cumsum())
+            .astype(int)
+        )
+        out["anchor_price"] = out.groupby([ticker_col, "regime_id"])[price_col].transform("first")
+        out["drift_since_report"] = np.where(
+            out[price_col].notna() & out["anchor_price"].notna() & out["anchor_price"].ne(0),
+            np.log(out[price_col]) - np.log(out["anchor_price"]),
+            np.nan,
+        )
+        out["days_since_report"] = out.groupby([ticker_col, "regime_id"]).cumcount()
+        days_den = np.maximum(out["days_since_report"].to_numpy(dtype=float), 1.0)
+        out["reaction_speed"] = np.clip(
+            np.asarray(out["drift_since_report"], dtype=float) / days_den,
+            reaction_clip[0],
+            reaction_clip[1],
+        )
+
+    if max_stage >= 5:
+        if price_col not in out.columns:
+            raise KeyError(f"Missing required column for vol_regime_ratio_20_60: {price_col}")
+
+        out[price_col] = pd.to_numeric(out[price_col], errors="coerce")
+        out.loc[out[price_col] <= 0, price_col] = np.nan
+        ret = out.groupby(ticker_col)[price_col].transform(lambda s: np.log(s).diff())
+
+        annualize = np.sqrt(252.0)
+        out["realized_vol_20d"] = ret.groupby(out[ticker_col]).transform(
+            lambda s: s.rolling(window=vol_short_window, min_periods=vol_short_min_obs).std(ddof=0) * annualize
+        )
+        out["realized_vol_60d"] = ret.groupby(out[ticker_col]).transform(
+            lambda s: s.rolling(window=vol_long_window, min_periods=vol_long_min_obs).std(ddof=0) * annualize
+        )
+        out["vol_regime_ratio_20_60"] = out["realized_vol_20d"] / (out["realized_vol_60d"] + vol_epsilon)
+
+    return out
+
+
 def winsorize_cross_sectional(
     panel_df: pd.DataFrame,
     feature_cols: list[str],
