@@ -1,0 +1,86 @@
+{
+  "feature_cols_stage5": [
+    "roe_change",
+    "margin_change",
+    "leverage_change",
+    "eps_growth",
+    "book_value_growth",
+    "log_return",
+    "rolling_beta",
+    "volume_ratio",
+    "roe_change_accel",
+    "margin_change_accel",
+    "eps_growth_surprise",
+    "reaction_speed",
+    "vol_regime_ratio_20_60"
+  ],
+  "feature_count_stage5": 13,
+  "availability_diff_abs_sum": {
+    "roe_change_accel": 6609.894834999999,
+    "margin_change_accel": 19621.211318,
+    "eps_growth_surprise": 2638.333819786154
+  },
+  "availability_change_rows": {
+    "roe_change_accel": 790,
+    "margin_change_accel": 735,
+    "eps_growth_surprise": 772
+  },
+  "availability_violation_rows": {
+    "roe_change_accel": 69,
+    "margin_change_accel": 14,
+    "eps_growth_surprise": 81
+  },
+  "reaction_reset_summary": {
+    "reset_rows": 751,
+    "max_abs_reaction_on_reset": 0.0007191073877159205,
+    "mean_abs_reaction_on_reset": 1.7457954063169982e-06,
+    "nonzero_reset_rows_tol_1e-10": 15
+  },
+  "reaction_bounds": {
+    "min": -0.05,
+    "max": 0.05
+  },
+  "vol_regime_ratio_stats": {
+    "q95": 1.3213562763652524,
+    "q99": 1.4940888480299874,
+    "max": 1.6937621113218713
+  },
+  "max_abs_pairwise_corr": 0.6670788870496683,
+  "corr_pairs_abs_ge_0_95": [],
+  "tensor_shapes": {
+    "X_train": [
+      0,
+      60,
+      13
+    ],
+    "X_dev": [
+      0,
+      60,
+      13
+    ],
+    "X_test": [
+      0,
+      60,
+      13
+    ],
+    "feature_count_used": 13,
+    "feature_columns_used": [
+      "roe_change_z",
+      "margin_change_z",
+      "leverage_change_z",
+      "eps_growth_z",
+      "book_value_growth_z",
+      "log_return_z",
+      "rolling_beta_z",
+      "volume_ratio_z",
+      "roe_change_accel_z",
+      "margin_change_accel_z",
+      "eps_growth_surprise_z",
+      "reaction_speed_z",
+      "vol_regime_ratio_20_60_z"
+    ]
+  },
+  "plot_ticker": "AAPL",
+  "reaction_plot_path": "/Users/assortedsphinx/Desktop/team_t/data/lstm_draft/processed/diagnostics/reaction_speed_AAPL.png",
+  "diagnostics_dir": "/Users/assortedsphinx/Desktop/team_t/data/lstm_draft/processed/diagnostics"
+}

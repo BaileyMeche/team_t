@@ -1,0 +1,19 @@
+{
+  "availability_violation_rows_raw": {
+    "roe_change_accel": 0,
+    "margin_change_accel": 0,
+    "eps_growth_surprise": 0
+  },
+  "availability_change_rows_raw": {
+    "roe_change_accel": 721,
+    "margin_change_accel": 721,
+    "eps_growth_surprise": 691
+  },
+  "reaction_reset_raw": {
+    "reset_rows": 751,
+    "max_abs_reaction_on_reset": 0.0,
+    "mean_abs_reaction_on_reset": 0.0,
+    "nonzero_reset_rows_tol_1e-10": 0
+  },
+  "first_non_empty_tensor_fold": null
+}

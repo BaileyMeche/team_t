@@ -1,0 +1,11 @@
+ticker,feature_available_date_nunique,roe_change_accel_nunique,margin_change_accel_nunique,eps_growth_surprise_nunique
+AAPL,74,75,72,75
+BRK_B,74,77,74,73
+CVX,74,79,74,72
+GE,74,78,74,80
+GOOGL,74,73,73,73
+IBM,74,78,74,74
+JNJ,74,85,77,81
+MSFT,74,77,72,74
+WMT,75,90,73,94
+XOM,74,78,72,76
