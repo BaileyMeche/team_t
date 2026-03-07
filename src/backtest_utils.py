@@ -46,6 +46,10 @@ EXIT_REASON_DTE = "dte_threshold"
 EXIT_REASON_SIGNAL = "signal_exit"
 EXIT_REASON_HPR = "hpr_limit_exit"
 
+# Module-level miss counter — incremented by _lookup_option on every cache miss.
+# Reset to 0 at the start of each run_backtest call.
+_LOOKUP_MISSES: int = 0
+
 
 def _f(val, default: float = float("nan")) -> float:
     """float() that handles pd.NA / None without raising TypeError."""
@@ -79,21 +83,83 @@ def _f(val, default: float = float("nan")) -> float:
 def _lookup_option(
     options_indexed: pd.DataFrame,
     ticker: str,
-    date: pd.Timestamp,
-    expiry: pd.Timestamp | None,
-    dte_min: int | None = None,
-    dte_max: int | None = None,
-    moneyness_min: float | None = None,
-    moneyness_max: float | None = None,
-    min_open_interest: int | None = None,
-    max_spread_frac: float | None = None,
-) -> pd.Series | None:
-    """Look up option row for a held position: same ticker, date, and expiry.
+    date: "pd.Timestamp",
+    expiry: "pd.Timestamp | None",
+    dte_min: "int | None" = None,
+    dte_max: "int | None" = None,
+    moneyness_min: "float | None" = None,
+    moneyness_max: "float | None" = None,
+    min_open_interest: "int | None" = None,
+    max_spread_frac: "float | None" = None,
+    _opt_lookup: "dict | None" = None,  # NEW: pre-built (date, ticker) → list[dict]
+) -> "pd.Series | None":
+    """Fast O(1) option lookup via pre-built dict.
 
-    Falls back to any row for that ticker/date if specific expiry is not found.
+    When _opt_lookup is provided (the normal path inside run_backtest), the
+    function does a single dict key access then iterates the pre-sorted
+    candidate list.  The list is already ordered ATM-closest first, highest
+    open-interest second (set up once in the pre-build block), so the first
+    row that passes all filters is the correct result.
+
+    Falls back to the original DataFrame-slice path when _opt_lookup is None.
     """
+    global _LOOKUP_MISSES
+
+    # ── Fast path ────────────────────────────────────────────────────────────
+    if _opt_lookup is not None:
+        date_ts = pd.Timestamp(date)
+        candidates = _opt_lookup.get((date_ts, str(ticker)), [])
+        if not candidates:
+            _LOOKUP_MISSES += 1
+            return None
+        for row in candidates:  # pre-sorted: ATM-closest, highest OI first
+            # Expiry match
+            if expiry is not None:
+                row_exp = row.get("exdate")
+                if row_exp is not None and pd.Timestamp(row_exp) != pd.Timestamp(expiry):
+                    continue
+            # DTE filter
+            dte_val = row.get("dte")
+            if dte_val is None:
+                continue
+            dte_f = float(dte_val)
+            if np.isnan(dte_f):
+                continue
+            if dte_min is not None and dte_f < dte_min:
+                continue
+            if dte_max is not None and dte_f > dte_max:
+                continue
+            # Moneyness filter
+            mny = row.get("moneyness")
+            if mny is not None:
+                mny_f = float(mny)
+                if not np.isnan(mny_f):
+                    if moneyness_min is not None and mny_f < moneyness_min:
+                        continue
+                    if moneyness_max is not None and mny_f > moneyness_max:
+                        continue
+            # Open interest filter
+            if min_open_interest is not None:
+                oi = row.get("open_interest")
+                if oi is None or float(oi) < min_open_interest:
+                    continue
+            # Spread filter
+            if max_spread_frac is not None:
+                bid = row.get("best_bid")
+                ask = row.get("best_offer")
+                mid = row.get("mid_price")
+                if bid is not None and ask is not None and mid and float(mid) > 0:
+                    if (float(ask) - float(bid)) / float(mid) > max_spread_frac:
+                        continue
+            # Passed all filters — return as pd.Series for drop-in compatibility
+            return pd.Series(row)
+        # All candidates were filtered out
+        _LOOKUP_MISSES += 1
+        return None
+
+    # ── Legacy fallback (original DataFrame-slice path) ──────────────────────
     try:
-        sub = options_indexed.loc[(date, ticker)]
+        sub = options_indexed.loc[(pd.Timestamp(date), str(ticker))]
         if isinstance(sub, pd.Series):
             sub = sub.to_frame().T
         if expiry is not None:
@@ -114,11 +180,9 @@ def _lookup_option(
             bid = pd.to_numeric(sub["best_bid"], errors="coerce")
             ask = pd.to_numeric(sub["best_offer"], errors="coerce")
             mid = pd.to_numeric(sub["mid_price"], errors="coerce").replace(0.0, np.nan)
-            spread_frac = (ask - bid) / mid
-            sub = sub[spread_frac <= float(max_spread_frac)]
+            sub = sub[(ask - bid) / mid <= float(max_spread_frac)]
         if not sub.empty:
             out = sub.copy()
-            # Deterministic tie-break: tighter ATM first, then highest OI.
             if "moneyness" in out.columns:
                 out["_atm_dist"] = (pd.to_numeric(out["moneyness"], errors="coerce") - 1.0).abs()
             else:
@@ -128,7 +192,7 @@ def _lookup_option(
             else:
                 out["_oi"] = np.nan
             out = out.sort_values(
-                by=["_atm_dist", "_oi"],
+                by=[c for c in ["_atm_dist", "_oi"] if c in out.columns],
                 ascending=[True, False],
                 kind="stable",
                 na_position="last",
@@ -136,6 +200,7 @@ def _lookup_option(
             return out.iloc[0]
     except KeyError:
         pass
+    _LOOKUP_MISSES += 1
     return None
 
 
@@ -237,8 +302,53 @@ def run_backtest(
                 return d
         return None
 
-    # Index options for fast lookup by (date, ticker)
+    # ── Pre-build fast option lookup dict ──────────────────────────────────
+    # Key: (date, ticker) → list of option rows (as dicts), pre-sorted by
+    # ATM proximity asc, open_interest desc.  _lookup_option then does an
+    # O(1) dict access instead of a DataFrame .loc + filter chain per call.
+    global _LOOKUP_MISSES
+    _LOOKUP_MISSES = 0  # reset counter for this run
+
+    print("[backtest] Building option lookup dict...", flush=True)
+    _t0_lookup = __import__("time").time()
+
+    # Parse numeric columns once (avoids repeated pd.to_numeric in hot loop)
+    for _col in ["mid_price", "delta", "underlying_price", "dte", "strike_price",
+                 "open_interest", "best_bid", "best_offer", "moneyness"]:
+        if _col in options_df.columns:
+            options_df[_col] = pd.to_numeric(options_df[_col], errors="coerce")
+
+    # Compute ATM distance once
+    if "moneyness" in options_df.columns:
+        options_df["_atm_dist"] = (options_df["moneyness"] - 1.0).abs()
+    else:
+        options_df["_atm_dist"] = np.nan
+
+    # Sort globally so each group list is already in lookup-priority order
+    _sort_cols: list[str] = []
+    _sort_asc: list[bool] = []
+    if "_atm_dist" in options_df.columns:
+        _sort_cols.append("_atm_dist");  _sort_asc.append(True)
+    if "open_interest" in options_df.columns:
+        _sort_cols.append("open_interest"); _sort_asc.append(False)
+    if _sort_cols:
+        options_df = options_df.sort_values(_sort_cols, ascending=_sort_asc, kind="stable")
+
+    # Build dict: (date, ticker) → list[dict]
+    _opt_lookup: dict[tuple, list[dict]] = {}
+    for (_date, _ticker), _grp in options_df.groupby(["date", "ticker"], sort=False):
+        _opt_lookup[(_date, _ticker)] = _grp.to_dict("records")
+
+    # Keep options_indexed for any code paths that call _lookup_option without
+    # _opt_lookup (e.g. external callers); not used in the hot loop below.
     options_indexed = options_df.set_index(["date", "ticker"]).sort_index()
+
+    _elapsed_lookup = __import__("time").time() - _t0_lookup
+    print(
+        f"[backtest] Option lookup dict built: {len(_opt_lookup):,} keys "
+        f"in {_elapsed_lookup:.1f}s",
+        flush=True,
+    )
 
     # All prediction dates in order
     all_pred_dates = sorted(ranked["date"].unique())
@@ -261,10 +371,25 @@ def run_backtest(
     # Iterate over all dates in the union of prediction + option dates
     all_dates = sorted(set(all_pred_dates) | set(all_option_dates))
 
+    # Yearly progress tracker (state stored on function object to avoid a
+    # closure variable that would survive across calls in the same process)
+    _last_year_printed: list[int | None] = [None]  # mutable container
+
     for current_date in all_dates:
         current_ts = pd.Timestamp(current_date)
         daily_portfolio_pnl = 0.0
         exited_any_today = False
+
+        # Progress: print once per calendar year (real-time via flush=True)
+        _cur_year = current_ts.year
+        if _cur_year != _last_year_printed[0]:
+            _last_year_printed[0] = _cur_year
+            print(
+                f"[backtest] {current_ts.date()}  "
+                f"open={len(open_positions)}  queued={len(entry_queue)}  "
+                f"trades_logged={len(trade_log)}",
+                flush=True,
+            )
 
         # ================================================================
         # Step 1: Enter queued positions whose entry_date == today
@@ -290,6 +415,7 @@ def run_backtest(
                 moneyness_max=entry_moneyness_max,
                 min_open_interest=entry_min_open_interest,
                 max_spread_frac=entry_max_spread_frac,
+                _opt_lookup=_opt_lookup,
             )
             if opt_row is None:
                 warnings.warn(
@@ -368,7 +494,8 @@ def run_backtest(
 
         for ticker, pos in list(open_positions.items()):
             opt_row = _lookup_option(
-                options_indexed, ticker, current_ts, pos["expiry"]
+                options_indexed, ticker, current_ts, pos["expiry"],
+                _opt_lookup=_opt_lookup,
             )
             if opt_row is None:
                 open_positions[ticker]["days_held"] += 1
@@ -522,6 +649,7 @@ def run_backtest(
                         moneyness_max=entry_moneyness_max,
                         min_open_interest=entry_min_open_interest,
                         max_spread_frac=entry_max_spread_frac,
+                        _opt_lookup=_opt_lookup,
                     )
                     entry_queue.append({
                         "signal_date": current_ts,
@@ -543,6 +671,13 @@ def run_backtest(
             "n_open_positions": len(open_positions),
             "open_tickers": sorted(open_positions.keys()),
         })
+
+    print(
+        f"[backtest] Loop complete. Dates processed: {len(all_dates):,}  "
+        f"Trade log rows: {len(trade_log)}  "
+        f"Option lookup misses (no data found): {_LOOKUP_MISSES:,}",
+        flush=True,
+    )
 
     # --- Post-processing ---
     daily_df = pd.DataFrame(daily_rows).set_index("date")

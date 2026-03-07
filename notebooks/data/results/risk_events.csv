@@ -1,0 +1,188 @@
+date,trigger_type,value,description,suggested_action
+2010-01-19,single_name_concentration_breach,1.0,single_name_concentration_breach detected from daily marked exposures.,enforce_limit_reduce_positions
+2010-02-18,single_name_concentration_breach,1.0,single_name_concentration_breach detected from daily marked exposures.,enforce_limit_reduce_positions
+2010-04-19,single_name_concentration_breach,1.0,single_name_concentration_breach detected from daily marked exposures.,enforce_limit_reduce_positions
+2010-04-20,volatility_spike,0.000250849148486443,Vol 0.03% exceeded 2.0× trailing median. Suggested action: tighten stop-losses and reduce position size.,tighten_stops_reduce_size
+2010-04-22,single_name_concentration_breach,1.0,single_name_concentration_breach detected from daily marked exposures.,enforce_limit_reduce_positions
+2010-05-18,single_name_concentration_breach,1.0,single_name_concentration_breach detected from daily marked exposures.,enforce_limit_reduce_positions
+2010-05-20,volatility_spike,0.0001218271670410965,Vol 0.01% exceeded 2.0× trailing median. Suggested action: tighten stop-losses and reduce position size.,tighten_stops_reduce_size
+2010-07-19,single_name_concentration_breach,1.0,single_name_concentration_breach detected from daily marked exposures.,enforce_limit_reduce_positions
+2010-07-20,volatility_spike,0.0005673455978554728,Vol 0.06% exceeded 2.0× trailing median. Suggested action: tighten stop-losses and reduce position size.,tighten_stops_reduce_size
+2010-08-17,single_name_concentration_breach,1.0,single_name_concentration_breach detected from daily marked exposures.,enforce_limit_reduce_positions
+2010-10-19,single_name_concentration_breach,1.0,single_name_concentration_breach detected from daily marked exposures.,enforce_limit_reduce_positions
+2010-10-21,volatility_spike,0.000500062905183287,Vol 0.05% exceeded 2.0× trailing median. Suggested action: tighten stop-losses and reduce position size.,tighten_stops_reduce_size
+2010-11-16,single_name_concentration_breach,1.0,single_name_concentration_breach detected from daily marked exposures.,enforce_limit_reduce_positions
+2011-04-19,single_name_concentration_breach,0.8263157894736842,single_name_concentration_breach detected from daily marked exposures.,enforce_limit_reduce_positions
+2011-04-20,volatility_spike,0.00041183261557255755,Vol 0.04% exceeded 2.0× trailing median. Suggested action: tighten stop-losses and reduce position size.,tighten_stops_reduce_size
+2011-05-17,single_name_concentration_breach,1.0,single_name_concentration_breach detected from daily marked exposures.,enforce_limit_reduce_positions
+2011-10-17,single_name_concentration_breach,1.0,single_name_concentration_breach detected from daily marked exposures.,enforce_limit_reduce_positions
+2011-10-18,volatility_spike,0.00038897894480511365,Vol 0.04% exceeded 2.0× trailing median. Suggested action: tighten stop-losses and reduce position size.,tighten_stops_reduce_size
+2011-11-15,single_name_concentration_breach,1.0,single_name_concentration_breach detected from daily marked exposures.,enforce_limit_reduce_positions
+2012-05-17,single_name_concentration_breach,1.0,single_name_concentration_breach detected from daily marked exposures.,enforce_limit_reduce_positions
+2012-07-19,single_name_concentration_breach,1.0,single_name_concentration_breach detected from daily marked exposures.,enforce_limit_reduce_positions
+2012-11-15,single_name_concentration_breach,1.0,single_name_concentration_breach detected from daily marked exposures.,enforce_limit_reduce_positions
+2012-11-16,volatility_spike,3.3915225010701575e-05,Vol 0.00% exceeded 2.0× trailing median. Suggested action: tighten stop-losses and reduce position size.,tighten_stops_reduce_size
+2013-02-01,single_name_concentration_breach,1.0,single_name_concentration_breach detected from daily marked exposures.,enforce_limit_reduce_positions
+2013-02-04,volatility_spike,2.2631424972618013e-05,Vol 0.00% exceeded 2.0× trailing median. Suggested action: tighten stop-losses and reduce position size.,tighten_stops_reduce_size
+2013-04-16,single_name_concentration_breach,1.0,single_name_concentration_breach detected from daily marked exposures.,enforce_limit_reduce_positions
+2013-04-17,volatility_spike,0.00043701444116260173,Vol 0.04% exceeded 2.0× trailing median. Suggested action: tighten stop-losses and reduce position size.,tighten_stops_reduce_size
+2013-07-18,single_name_concentration_breach,1.0,single_name_concentration_breach detected from daily marked exposures.,enforce_limit_reduce_positions
+2013-08-15,single_name_concentration_breach,1.0,single_name_concentration_breach detected from daily marked exposures.,enforce_limit_reduce_positions
+2013-08-16,volatility_spike,2.0732751291768266e-05,Vol 0.00% exceeded 2.0× trailing median. Suggested action: tighten stop-losses and reduce position size.,tighten_stops_reduce_size
+2013-10-15,single_name_concentration_breach,1.0,single_name_concentration_breach detected from daily marked exposures.,enforce_limit_reduce_positions
+2013-10-16,volatility_spike,6.418459135912262e-05,Vol 0.01% exceeded 2.0× trailing median. Suggested action: tighten stop-losses and reduce position size.,tighten_stops_reduce_size
+2013-11-01,single_name_concentration_breach,1.0,single_name_concentration_breach detected from daily marked exposures.,enforce_limit_reduce_positions
+2014-01-17,single_name_concentration_breach,1.0,single_name_concentration_breach detected from daily marked exposures.,enforce_limit_reduce_positions
+2014-02-20,single_name_concentration_breach,1.0,single_name_concentration_breach detected from daily marked exposures.,enforce_limit_reduce_positions
+2014-02-24,single_name_concentration_breach,1.0,single_name_concentration_breach detected from daily marked exposures.,enforce_limit_reduce_positions
+2014-02-24,volatility_spike,7.045400088706684e-05,Vol 0.01% exceeded 2.0× trailing median. Suggested action: tighten stop-losses and reduce position size.,tighten_stops_reduce_size
+2014-04-15,single_name_concentration_breach,1.0,single_name_concentration_breach detected from daily marked exposures.,enforce_limit_reduce_positions
+2014-04-16,volatility_spike,5.1350497406822234e-05,Vol 0.01% exceeded 2.0× trailing median. Suggested action: tighten stop-losses and reduce position size.,tighten_stops_reduce_size
+2014-05-01,single_name_concentration_breach,1.0,single_name_concentration_breach detected from daily marked exposures.,enforce_limit_reduce_positions
+2014-05-15,single_name_concentration_breach,1.0,single_name_concentration_breach detected from daily marked exposures.,enforce_limit_reduce_positions
+2014-07-15,single_name_concentration_breach,1.0,single_name_concentration_breach detected from daily marked exposures.,enforce_limit_reduce_positions
+2014-08-01,single_name_concentration_breach,1.0,single_name_concentration_breach detected from daily marked exposures.,enforce_limit_reduce_positions
+2014-08-04,volatility_spike,7.40822505258267e-05,Vol 0.01% exceeded 2.0× trailing median. Suggested action: tighten stop-losses and reduce position size.,tighten_stops_reduce_size
+2014-08-14,single_name_concentration_breach,1.0,single_name_concentration_breach detected from daily marked exposures.,enforce_limit_reduce_positions
+2014-10-17,single_name_concentration_breach,1.0,single_name_concentration_breach detected from daily marked exposures.,enforce_limit_reduce_positions
+2014-10-20,volatility_spike,2.5220707021381964e-05,Vol 0.00% exceeded 2.0× trailing median. Suggested action: tighten stop-losses and reduce position size.,tighten_stops_reduce_size
+2014-11-13,single_name_concentration_breach,1.0,single_name_concentration_breach detected from daily marked exposures.,enforce_limit_reduce_positions
+2015-01-20,single_name_concentration_breach,1.0,single_name_concentration_breach detected from daily marked exposures.,enforce_limit_reduce_positions
+2015-01-22,single_name_concentration_breach,1.0,single_name_concentration_breach detected from daily marked exposures.,enforce_limit_reduce_positions
+2015-01-22,volatility_spike,0.0004278737376481135,Vol 0.04% exceeded 2.0× trailing median. Suggested action: tighten stop-losses and reduce position size.,tighten_stops_reduce_size
+2015-02-19,single_name_concentration_breach,1.0,single_name_concentration_breach detected from daily marked exposures.,enforce_limit_reduce_positions
+2015-04-17,single_name_concentration_breach,1.0,single_name_concentration_breach detected from daily marked exposures.,enforce_limit_reduce_positions
+2015-04-23,single_name_concentration_breach,1.0,single_name_concentration_breach detected from daily marked exposures.,enforce_limit_reduce_positions
+2015-04-24,volatility_spike,0.003902906537841614,Vol 0.39% exceeded 2.0× trailing median. Suggested action: tighten stop-losses and reduce position size.,tighten_stops_reduce_size
+2015-05-19,single_name_concentration_breach,1.0,single_name_concentration_breach detected from daily marked exposures.,enforce_limit_reduce_positions
+2015-05-21,single_name_concentration_breach,1.0,single_name_concentration_breach detected from daily marked exposures.,enforce_limit_reduce_positions
+2015-07-14,single_name_concentration_breach,1.0,single_name_concentration_breach detected from daily marked exposures.,enforce_limit_reduce_positions
+2015-07-15,volatility_spike,1.8302580247319613e-05,Vol 0.00% exceeded 2.0× trailing median. Suggested action: tighten stop-losses and reduce position size.,tighten_stops_reduce_size
+2015-10-13,single_name_concentration_breach,1.0,single_name_concentration_breach detected from daily marked exposures.,enforce_limit_reduce_positions
+2015-10-14,volatility_spike,0.00018663706650160028,Vol 0.02% exceeded 2.0× trailing median. Suggested action: tighten stop-losses and reduce position size.,tighten_stops_reduce_size
+2016-01-28,single_name_concentration_breach,1.0,single_name_concentration_breach detected from daily marked exposures.,enforce_limit_reduce_positions
+2016-02-18,single_name_concentration_breach,1.0,single_name_concentration_breach detected from daily marked exposures.,enforce_limit_reduce_positions
+2016-02-19,volatility_spike,9.139377612563626e-05,Vol 0.01% exceeded 2.0× trailing median. Suggested action: tighten stop-losses and reduce position size.,tighten_stops_reduce_size
+2016-04-19,single_name_concentration_breach,1.0,single_name_concentration_breach detected from daily marked exposures.,enforce_limit_reduce_positions
+2016-04-20,volatility_spike,0.00022659572571813647,Vol 0.02% exceeded 2.0× trailing median. Suggested action: tighten stop-losses and reduce position size.,tighten_stops_reduce_size
+2016-05-19,single_name_concentration_breach,1.0,single_name_concentration_breach detected from daily marked exposures.,enforce_limit_reduce_positions
+2016-05-23,single_name_concentration_breach,1.0,single_name_concentration_breach detected from daily marked exposures.,enforce_limit_reduce_positions
+2016-05-23,volatility_spike,0.00017218165412709983,Vol 0.02% exceeded 2.0× trailing median. Suggested action: tighten stop-losses and reduce position size.,tighten_stops_reduce_size
+2016-07-19,single_name_concentration_breach,0.5139751552795031,single_name_concentration_breach detected from daily marked exposures.,enforce_limit_reduce_positions
+2016-07-20,volatility_spike,2.668520059156816e-05,Vol 0.00% exceeded 2.0× trailing median. Suggested action: tighten stop-losses and reduce position size.,tighten_stops_reduce_size
+2016-07-29,single_name_concentration_breach,1.0,single_name_concentration_breach detected from daily marked exposures.,enforce_limit_reduce_positions
+2016-08-18,single_name_concentration_breach,1.0,single_name_concentration_breach detected from daily marked exposures.,enforce_limit_reduce_positions
+2016-10-27,single_name_concentration_breach,1.0,single_name_concentration_breach detected from daily marked exposures.,enforce_limit_reduce_positions
+2016-11-17,single_name_concentration_breach,1.0,single_name_concentration_breach detected from daily marked exposures.,enforce_limit_reduce_positions
+2016-11-18,volatility_spike,6.35312139406051e-05,Vol 0.01% exceeded 2.0× trailing median. Suggested action: tighten stop-losses and reduce position size.,tighten_stops_reduce_size
+2017-01-20,single_name_concentration_breach,1.0,single_name_concentration_breach detected from daily marked exposures.,enforce_limit_reduce_positions
+2017-01-27,single_name_concentration_breach,1.0,single_name_concentration_breach detected from daily marked exposures.,enforce_limit_reduce_positions
+2017-01-30,volatility_spike,0.0003655054383811595,Vol 0.04% exceeded 2.0× trailing median. Suggested action: tighten stop-losses and reduce position size.,tighten_stops_reduce_size
+2017-04-18,single_name_concentration_breach,1.0,single_name_concentration_breach detected from daily marked exposures.,enforce_limit_reduce_positions
+2017-04-19,volatility_spike,0.0001270043866788474,Vol 0.01% exceeded 2.0× trailing median. Suggested action: tighten stop-losses and reduce position size.,tighten_stops_reduce_size
+2017-04-28,single_name_concentration_breach,1.0,single_name_concentration_breach detected from daily marked exposures.,enforce_limit_reduce_positions
+2017-05-18,single_name_concentration_breach,1.0,single_name_concentration_breach detected from daily marked exposures.,enforce_limit_reduce_positions
+2017-07-18,single_name_concentration_breach,0.5715460526315789,single_name_concentration_breach detected from daily marked exposures.,enforce_limit_reduce_positions
+2017-07-28,single_name_concentration_breach,0.6192982456140351,single_name_concentration_breach detected from daily marked exposures.,enforce_limit_reduce_positions
+2017-07-31,volatility_spike,0.00021496387651301395,Vol 0.02% exceeded 2.0× trailing median. Suggested action: tighten stop-losses and reduce position size.,tighten_stops_reduce_size
+2017-08-17,single_name_concentration_breach,1.0,single_name_concentration_breach detected from daily marked exposures.,enforce_limit_reduce_positions
+2017-10-17,single_name_concentration_breach,1.0,single_name_concentration_breach detected from daily marked exposures.,enforce_limit_reduce_positions
+2017-10-18,volatility_spike,5.809322875979077e-05,Vol 0.01% exceeded 2.0× trailing median. Suggested action: tighten stop-losses and reduce position size.,tighten_stops_reduce_size
+2017-10-27,single_name_concentration_breach,1.0,single_name_concentration_breach detected from daily marked exposures.,enforce_limit_reduce_positions
+2017-11-16,single_name_concentration_breach,1.0,single_name_concentration_breach detected from daily marked exposures.,enforce_limit_reduce_positions
+2018-04-26,single_name_concentration_breach,1.0,single_name_concentration_breach detected from daily marked exposures.,enforce_limit_reduce_positions
+2018-04-27,volatility_spike,0.0005386595307824577,Vol 0.05% exceeded 2.0× trailing median. Suggested action: tighten stop-losses and reduce position size.,tighten_stops_reduce_size
+2018-07-20,single_name_concentration_breach,1.0,single_name_concentration_breach detected from daily marked exposures.,enforce_limit_reduce_positions
+2018-07-27,single_name_concentration_breach,1.0,single_name_concentration_breach detected from daily marked exposures.,enforce_limit_reduce_positions
+2018-08-16,single_name_concentration_breach,1.0,single_name_concentration_breach detected from daily marked exposures.,enforce_limit_reduce_positions
+2018-08-17,volatility_spike,4.4811577254706075e-06,Vol 0.00% exceeded 2.0× trailing median. Suggested action: tighten stop-losses and reduce position size.,tighten_stops_reduce_size
+2018-10-24,single_name_concentration_breach,1.0,single_name_concentration_breach detected from daily marked exposures.,enforce_limit_reduce_positions
+2018-11-15,single_name_concentration_breach,1.0,single_name_concentration_breach detected from daily marked exposures.,enforce_limit_reduce_positions
+2018-11-16,volatility_spike,0.00036093384860919243,Vol 0.04% exceeded 2.0× trailing median. Suggested action: tighten stop-losses and reduce position size.,tighten_stops_reduce_size
+2019-01-22,single_name_concentration_breach,1.0,single_name_concentration_breach detected from daily marked exposures.,enforce_limit_reduce_positions
+2019-01-23,volatility_spike,9.059850211983298e-06,Vol 0.00% exceeded 2.0× trailing median. Suggested action: tighten stop-losses and reduce position size.,tighten_stops_reduce_size
+2019-02-01,single_name_concentration_breach,0.654879773691655,single_name_concentration_breach detected from daily marked exposures.,enforce_limit_reduce_positions
+2019-02-05,single_name_concentration_breach,0.6525157232704404,single_name_concentration_breach detected from daily marked exposures.,enforce_limit_reduce_positions
+2019-02-19,single_name_concentration_breach,1.0,single_name_concentration_breach detected from daily marked exposures.,enforce_limit_reduce_positions
+2019-04-16,single_name_concentration_breach,1.0,single_name_concentration_breach detected from daily marked exposures.,enforce_limit_reduce_positions
+2019-04-17,volatility_spike,0.00010589572154845876,Vol 0.01% exceeded 2.0× trailing median. Suggested action: tighten stop-losses and reduce position size.,tighten_stops_reduce_size
+2019-07-16,single_name_concentration_breach,1.0,single_name_concentration_breach detected from daily marked exposures.,enforce_limit_reduce_positions
+2019-07-17,volatility_spike,0.00013677532580855887,Vol 0.01% exceeded 2.0× trailing median. Suggested action: tighten stop-losses and reduce position size.,tighten_stops_reduce_size
+2019-10-15,single_name_concentration_breach,1.0,single_name_concentration_breach detected from daily marked exposures.,enforce_limit_reduce_positions
+2019-10-17,volatility_spike,0.0005163504100001454,Vol 0.05% exceeded 2.0× trailing median. Suggested action: tighten stop-losses and reduce position size.,tighten_stops_reduce_size
+2019-10-17,single_name_concentration_breach,1.0,single_name_concentration_breach detected from daily marked exposures.,enforce_limit_reduce_positions
+2020-01-22,single_name_concentration_breach,1.0,single_name_concentration_breach detected from daily marked exposures.,enforce_limit_reduce_positions
+2020-02-03,single_name_concentration_breach,1.0,single_name_concentration_breach detected from daily marked exposures.,enforce_limit_reduce_positions
+2020-02-03,net_exposure_breach,0.07206962769297728,net_exposure_breach detected from daily marked exposures.,enforce_limit_reduce_positions
+2020-04-14,single_name_concentration_breach,1.0,single_name_concentration_breach detected from daily marked exposures.,enforce_limit_reduce_positions
+2020-04-15,volatility_spike,0.0004371676750371901,Vol 0.04% exceeded 2.0× trailing median. Suggested action: tighten stop-losses and reduce position size.,tighten_stops_reduce_size
+2020-05-01,single_name_concentration_breach,0.67618332081142,single_name_concentration_breach detected from daily marked exposures.,enforce_limit_reduce_positions
+2020-05-05,single_name_concentration_breach,1.0,single_name_concentration_breach detected from daily marked exposures.,enforce_limit_reduce_positions
+2020-05-19,single_name_concentration_breach,1.0,single_name_concentration_breach detected from daily marked exposures.,enforce_limit_reduce_positions
+2020-07-16,single_name_concentration_breach,1.0,single_name_concentration_breach detected from daily marked exposures.,enforce_limit_reduce_positions
+2020-07-17,volatility_spike,5.272478560464402e-05,Vol 0.01% exceeded 2.0× trailing median. Suggested action: tighten stop-losses and reduce position size.,tighten_stops_reduce_size
+2020-07-29,single_name_concentration_breach,1.0,single_name_concentration_breach detected from daily marked exposures.,enforce_limit_reduce_positions
+2020-08-18,single_name_concentration_breach,1.0,single_name_concentration_breach detected from daily marked exposures.,enforce_limit_reduce_positions
+2020-10-13,single_name_concentration_breach,1.0,single_name_concentration_breach detected from daily marked exposures.,enforce_limit_reduce_positions
+2020-10-14,volatility_spike,6.53981252175822e-05,Vol 0.01% exceeded 2.0× trailing median. Suggested action: tighten stop-losses and reduce position size.,tighten_stops_reduce_size
+2020-10-27,single_name_concentration_breach,1.0,single_name_concentration_breach detected from daily marked exposures.,enforce_limit_reduce_positions
+2021-01-26,single_name_concentration_breach,1.0,single_name_concentration_breach detected from daily marked exposures.,enforce_limit_reduce_positions
+2021-01-27,volatility_spike,7.830086370400279e-06,Vol 0.00% exceeded 2.0× trailing median. Suggested action: tighten stop-losses and reduce position size.,tighten_stops_reduce_size
+2021-04-20,single_name_concentration_breach,1.0,single_name_concentration_breach detected from daily marked exposures.,enforce_limit_reduce_positions
+2021-04-21,volatility_spike,8.875356881140214e-05,Vol 0.01% exceeded 2.0× trailing median. Suggested action: tighten stop-losses and reduce position size.,tighten_stops_reduce_size
+2021-04-27,single_name_concentration_breach,0.90948143602332,single_name_concentration_breach detected from daily marked exposures.,enforce_limit_reduce_positions
+2021-04-27,net_exposure_breach,0.12404683128619438,net_exposure_breach detected from daily marked exposures.,enforce_limit_reduce_positions
+2021-04-27,gross_exposure_breach,0.1403775521116893,gross_exposure_breach detected from daily marked exposures.,enforce_limit_reduce_positions
+2021-05-18,single_name_concentration_breach,1.0,single_name_concentration_breach detected from daily marked exposures.,enforce_limit_reduce_positions
+2021-07-19,single_name_concentration_breach,1.0,single_name_concentration_breach detected from daily marked exposures.,enforce_limit_reduce_positions
+2021-10-19,single_name_concentration_breach,1.0,single_name_concentration_breach detected from daily marked exposures.,enforce_limit_reduce_positions
+2021-10-20,volatility_spike,5.568652958555245e-05,Vol 0.01% exceeded 2.0× trailing median. Suggested action: tighten stop-losses and reduce position size.,tighten_stops_reduce_size
+2021-10-26,single_name_concentration_breach,1.0,single_name_concentration_breach detected from daily marked exposures.,enforce_limit_reduce_positions
+2021-11-16,single_name_concentration_breach,1.0,single_name_concentration_breach detected from daily marked exposures.,enforce_limit_reduce_positions
+2022-01-24,single_name_concentration_breach,1.0,single_name_concentration_breach detected from daily marked exposures.,enforce_limit_reduce_positions
+2022-02-01,single_name_concentration_breach,1.0,single_name_concentration_breach detected from daily marked exposures.,enforce_limit_reduce_positions
+2022-02-02,volatility_spike,0.00014122876241537416,Vol 0.01% exceeded 2.0× trailing median. Suggested action: tighten stop-losses and reduce position size.,tighten_stops_reduce_size
+2022-02-17,single_name_concentration_breach,1.0,single_name_concentration_breach detected from daily marked exposures.,enforce_limit_reduce_positions
+2022-05-17,single_name_concentration_breach,1.0,single_name_concentration_breach detected from daily marked exposures.,enforce_limit_reduce_positions
+2022-05-18,volatility_spike,0.002170401914725648,Vol 0.22% exceeded 2.0× trailing median. Suggested action: tighten stop-losses and reduce position size.,tighten_stops_reduce_size
+2022-07-19,single_name_concentration_breach,1.0,single_name_concentration_breach detected from daily marked exposures.,enforce_limit_reduce_positions
+2022-07-26,single_name_concentration_breach,1.0,single_name_concentration_breach detected from daily marked exposures.,enforce_limit_reduce_positions
+2022-07-27,volatility_spike,0.00011074668858164607,Vol 0.01% exceeded 2.0× trailing median. Suggested action: tighten stop-losses and reduce position size.,tighten_stops_reduce_size
+2022-07-29,single_name_concentration_breach,1.0,single_name_concentration_breach detected from daily marked exposures.,enforce_limit_reduce_positions
+2022-08-16,single_name_concentration_breach,1.0,single_name_concentration_breach detected from daily marked exposures.,enforce_limit_reduce_positions
+2022-08-18,single_name_concentration_breach,1.0,single_name_concentration_breach detected from daily marked exposures.,enforce_limit_reduce_positions
+2022-10-18,single_name_concentration_breach,1.0,single_name_concentration_breach detected from daily marked exposures.,enforce_limit_reduce_positions
+2022-10-19,volatility_spike,5.3284853708279904e-05,Vol 0.01% exceeded 2.0× trailing median. Suggested action: tighten stop-losses and reduce position size.,tighten_stops_reduce_size
+2022-10-25,single_name_concentration_breach,1.0,single_name_concentration_breach detected from daily marked exposures.,enforce_limit_reduce_positions
+2022-10-27,single_name_concentration_breach,1.0,single_name_concentration_breach detected from daily marked exposures.,enforce_limit_reduce_positions
+2022-11-15,single_name_concentration_breach,1.0,single_name_concentration_breach detected from daily marked exposures.,enforce_limit_reduce_positions
+2022-11-17,single_name_concentration_breach,1.0,single_name_concentration_breach detected from daily marked exposures.,enforce_limit_reduce_positions
+2023-02-02,single_name_concentration_breach,1.0,single_name_concentration_breach detected from daily marked exposures.,enforce_limit_reduce_positions
+2023-02-03,volatility_spike,0.0009300508015302352,Vol 0.09% exceeded 2.0× trailing median. Suggested action: tighten stop-losses and reduce position size.,tighten_stops_reduce_size
+2023-04-18,single_name_concentration_breach,1.0,single_name_concentration_breach detected from daily marked exposures.,enforce_limit_reduce_positions
+2023-04-25,single_name_concentration_breach,1.0,single_name_concentration_breach detected from daily marked exposures.,enforce_limit_reduce_positions
+2023-04-26,volatility_spike,0.0003702262342685278,Vol 0.04% exceeded 2.0× trailing median. Suggested action: tighten stop-losses and reduce position size.,tighten_stops_reduce_size
+2023-05-18,single_name_concentration_breach,1.0,single_name_concentration_breach detected from daily marked exposures.,enforce_limit_reduce_positions
+2023-05-22,single_name_concentration_breach,1.0,single_name_concentration_breach detected from daily marked exposures.,enforce_limit_reduce_positions
+2023-07-28,single_name_concentration_breach,1.0,single_name_concentration_breach detected from daily marked exposures.,enforce_limit_reduce_positions
+2023-07-31,volatility_spike,0.0006278267647521028,Vol 0.06% exceeded 2.0× trailing median. Suggested action: tighten stop-losses and reduce position size.,tighten_stops_reduce_size
+2023-10-17,single_name_concentration_breach,1.0,single_name_concentration_breach detected from daily marked exposures.,enforce_limit_reduce_positions
+2023-10-18,volatility_spike,8.037260453761175e-05,Vol 0.01% exceeded 2.0× trailing median. Suggested action: tighten stop-losses and reduce position size.,tighten_stops_reduce_size
+2023-10-24,single_name_concentration_breach,1.0,single_name_concentration_breach detected from daily marked exposures.,enforce_limit_reduce_positions
+2023-11-02,single_name_concentration_breach,1.0,single_name_concentration_breach detected from daily marked exposures.,enforce_limit_reduce_positions
+2023-11-16,single_name_concentration_breach,1.0,single_name_concentration_breach detected from daily marked exposures.,enforce_limit_reduce_positions
+2024-01-30,single_name_concentration_breach,1.0,single_name_concentration_breach detected from daily marked exposures.,enforce_limit_reduce_positions
+2024-01-31,volatility_spike,0.0007992141676298974,Vol 0.08% exceeded 2.0× trailing median. Suggested action: tighten stop-losses and reduce position size.,tighten_stops_reduce_size
+2024-04-16,single_name_concentration_breach,1.0,single_name_concentration_breach detected from daily marked exposures.,enforce_limit_reduce_positions
+2024-04-17,volatility_spike,6.80814284489413e-05,Vol 0.01% exceeded 2.0× trailing median. Suggested action: tighten stop-losses and reduce position size.,tighten_stops_reduce_size
+2024-04-26,single_name_concentration_breach,1.0,single_name_concentration_breach detected from daily marked exposures.,enforce_limit_reduce_positions
+2024-05-16,single_name_concentration_breach,1.0,single_name_concentration_breach detected from daily marked exposures.,enforce_limit_reduce_positions
+2024-05-20,volatility_spike,5.778821942205268e-05,Vol 0.01% exceeded 2.0× trailing median. Suggested action: tighten stop-losses and reduce position size.,tighten_stops_reduce_size
+2024-05-20,single_name_concentration_breach,1.0,single_name_concentration_breach detected from daily marked exposures.,enforce_limit_reduce_positions
+2024-08-02,single_name_concentration_breach,1.0,single_name_concentration_breach detected from daily marked exposures.,enforce_limit_reduce_positions
+2024-08-06,volatility_spike,0.00031061129282930407,Vol 0.03% exceeded 2.0× trailing median. Suggested action: tighten stop-losses and reduce position size.,tighten_stops_reduce_size
+2024-08-06,single_name_concentration_breach,1.0,single_name_concentration_breach detected from daily marked exposures.,enforce_limit_reduce_positions
+2024-10-15,single_name_concentration_breach,1.0,single_name_concentration_breach detected from daily marked exposures.,enforce_limit_reduce_positions
+2024-10-16,volatility_spike,0.00012334286827224102,Vol 0.01% exceeded 2.0× trailing median. Suggested action: tighten stop-losses and reduce position size.,tighten_stops_reduce_size
+2024-11-01,single_name_concentration_breach,1.0,single_name_concentration_breach detected from daily marked exposures.,enforce_limit_reduce_positions
+2024-11-05,single_name_concentration_breach,1.0,single_name_concentration_breach detected from daily marked exposures.,enforce_limit_reduce_positions
