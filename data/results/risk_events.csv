@@ -1,0 +1,28 @@
+date,trigger_type,value,description
+2010-07-21,volatility_spike,0.0012381172766919887,Vol 0.12% exceeded 2.0× trailing median. Action: tighten stop-loss thresholds.
+2012-01-20,volatility_spike,0.2878215323364394,Vol 28.78% exceeded 2.0× trailing median. Action: tighten stop-loss thresholds.
+2012-04-18,volatility_spike,0.019885782231337877,Vol 1.99% exceeded 2.0× trailing median. Action: tighten stop-loss thresholds.
+2012-07-19,volatility_spike,0.03955536949167254,Vol 3.96% exceeded 2.0× trailing median. Action: tighten stop-loss thresholds.
+2012-10-23,volatility_spike,0.011521583919179994,Vol 1.15% exceeded 2.0× trailing median. Action: tighten stop-loss thresholds.
+2014-01-21,volatility_spike,0.006404046457531314,Vol 0.64% exceeded 2.0× trailing median. Action: tighten stop-loss thresholds.
+2014-04-16,volatility_spike,0.0017304715492801556,Vol 0.17% exceeded 2.0× trailing median. Action: tighten stop-loss thresholds.
+2014-04-24,drawdown_breach,-0.16257406720674528,Drawdown -16.26% breached -10% threshold. Action: reduce gross exposure 25–50% until recovery.
+2014-07-16,volatility_spike,0.006604936114157936,Vol 0.66% exceeded 2.0× trailing median. Action: tighten stop-loss thresholds.
+2014-10-15,volatility_spike,0.0008080336218521487,Vol 0.08% exceeded 2.0× trailing median. Action: tighten stop-loss thresholds.
+2015-01-30,volatility_spike,0.19527821830229486,Vol 19.53% exceeded 2.0× trailing median. Action: tighten stop-loss thresholds.
+2017-02-01,volatility_spike,0.005354617977691914,Vol 0.54% exceeded 2.0× trailing median. Action: tighten stop-loss thresholds.
+2017-08-02,volatility_spike,0.06527899199378544,Vol 6.53% exceeded 2.0× trailing median. Action: tighten stop-loss thresholds.
+2017-10-30,volatility_spike,0.0038556284148787857,Vol 0.39% exceeded 2.0× trailing median. Action: tighten stop-loss thresholds.
+2018-10-26,volatility_spike,0.05059683597620238,Vol 5.06% exceeded 2.0× trailing median. Action: tighten stop-loss thresholds.
+2020-01-23,volatility_spike,0.010577431120559441,Vol 1.06% exceeded 2.0× trailing median. Action: tighten stop-loss thresholds.
+2020-04-15,volatility_spike,0.01836750948665193,Vol 1.84% exceeded 2.0× trailing median. Action: tighten stop-loss thresholds.
+2020-10-29,volatility_spike,0.00022515719522128074,Vol 0.02% exceeded 2.0× trailing median. Action: tighten stop-loss thresholds.
+2022-04-29,volatility_spike,0.03307188741806821,Vol 3.31% exceeded 2.0× trailing median. Action: tighten stop-loss thresholds.
+2023-02-01,volatility_spike,0.008712077286217128,Vol 0.87% exceeded 2.0× trailing median. Action: tighten stop-loss thresholds.
+2023-04-26,volatility_spike,0.1894340652012413,Vol 18.94% exceeded 2.0× trailing median. Action: tighten stop-loss thresholds.
+2023-07-26,volatility_spike,0.034859999985851695,Vol 3.49% exceeded 2.0× trailing median. Action: tighten stop-loss thresholds.
+2023-10-25,volatility_spike,0.019082522040660823,Vol 1.91% exceeded 2.0× trailing median. Action: tighten stop-loss thresholds.
+2024-02-02,volatility_spike,0.009602905406200787,Vol 0.96% exceeded 2.0× trailing median. Action: tighten stop-loss thresholds.
+2024-04-24,volatility_spike,0.03432658961805412,Vol 3.43% exceeded 2.0× trailing median. Action: tighten stop-loss thresholds.
+2024-07-31,volatility_spike,0.03299965484434309,Vol 3.30% exceeded 2.0× trailing median. Action: tighten stop-loss thresholds.
+2024-11-01,volatility_spike,0.030211081340837526,Vol 3.02% exceeded 2.0× trailing median. Action: tighten stop-loss thresholds.
