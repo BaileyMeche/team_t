@@ -59,6 +59,236 @@ def _f(val, default: float = float("nan")) -> float:
         return default
 
 
+def _build_underlying_vol_lookup(
+    options_df: pd.DataFrame,
+    lookback_days: int = 21,
+) -> dict[tuple[pd.Timestamp, str], float]:
+    """Build (date, ticker) -> rolling daily realized vol from underlying prices."""
+    if lookback_days <= 1:
+        return {}
+    if not {"date", "ticker", "underlying_price"}.issubset(options_df.columns):
+        return {}
+
+    px = (
+        options_df[["date", "ticker", "underlying_price"]]
+        .dropna(subset=["date", "ticker", "underlying_price"])
+        .groupby(["date", "ticker"], as_index=False)["underlying_price"]
+        .first()
+    )
+    if px.empty:
+        return {}
+
+    px = px.sort_values(["ticker", "date"])
+    px["ret"] = px.groupby("ticker", sort=False)["underlying_price"].pct_change()
+    window = int(lookback_days)
+    min_periods = min(window, max(2, int(window // 2)))
+    px["realized_vol"] = px.groupby("ticker", sort=False)["ret"].transform(
+        lambda s: s.rolling(window, min_periods=min_periods).std()
+    )
+
+    out: dict[tuple[pd.Timestamp, str], float] = {}
+    for row in px[["date", "ticker", "realized_vol"]].itertuples(index=False):
+        vol = _f(row.realized_vol)
+        if np.isfinite(vol) and vol > 0:
+            out[(pd.Timestamp(row.date), str(row.ticker))] = float(vol)
+    return out
+
+
+def _compute_signal_weights(
+    candidates_df: pd.DataFrame,
+    signal_date: pd.Timestamp,
+    *,
+    allow_shorts: bool = False,
+    side_col: str = "signal_side",
+    use_vol_scaling: bool = True,
+    vol_lookup: dict[tuple[pd.Timestamp, str], float] | None = None,
+    vol_floor: float = 0.01,
+) -> dict[str, float]:
+    """Cross-sectional weights from signal strength (optionally vol-scaled)."""
+    if candidates_df.empty:
+        return {}
+    if "ticker" not in candidates_df.columns:
+        return {}
+
+    work = candidates_df.copy()
+    if "prediction" in work.columns:
+        work["prediction"] = pd.to_numeric(work["prediction"], errors="coerce").fillna(0.0)
+    else:
+        work["prediction"] = 0.0
+
+    if allow_shorts and side_col in work.columns:
+        side = pd.to_numeric(work[side_col], errors="coerce").fillna(0.0)
+        side = np.sign(side).replace(0.0, 1.0)
+        work["score"] = side * work["prediction"].abs()
+        if float(work["score"].abs().sum()) <= 0.0:
+            work["score"] = side
+    else:
+        # Long-only book: keep positive conviction and fall back to equal-weight.
+        work["score"] = work["prediction"].clip(lower=0.0)
+        if float(work["score"].sum()) <= 0.0:
+            work["score"] = 1.0
+
+    if use_vol_scaling:
+        lookup = vol_lookup or {}
+        floor = max(float(vol_floor), 1e-6)
+        sig_date = pd.Timestamp(signal_date)
+        vols = [lookup.get((sig_date, str(t)), np.nan) for t in work["ticker"]]
+        work["sigma"] = pd.to_numeric(pd.Series(vols, index=work.index), errors="coerce")
+        work["sigma"] = work["sigma"].where(work["sigma"] > floor, floor).fillna(floor)
+        work["score"] = work["score"] / work["sigma"]
+
+    denom = float(work["score"].abs().sum())
+    if not np.isfinite(denom) or denom <= 0.0:
+        n = len(work)
+        work["weight"] = 1.0 / n if n > 0 else 0.0
+    else:
+        work["weight"] = work["score"] / denom
+
+    weights = work.groupby("ticker", sort=False)["weight"].sum()
+    return {str(k): float(v) for k, v in weights.items()}
+
+
+def _contracts_for_target_delta_exposure(
+    target_delta_exposure: float,
+    option_delta: float,
+    underlying_price: float,
+) -> tuple[int, float]:
+    """Convert target delta-equivalent notional into whole option contracts."""
+    per_contract_exposure = abs(float(option_delta)) * CONTRACT_SIZE * abs(float(underlying_price))
+    if (
+        not np.isfinite(per_contract_exposure)
+        or per_contract_exposure <= 0.0
+        or not np.isfinite(target_delta_exposure)
+        or target_delta_exposure <= 0.0
+    ):
+        return 0, per_contract_exposure
+    return int(float(target_delta_exposure) // per_contract_exposure), float(per_contract_exposure)
+
+
+def _build_round_trip_trade_book(trade_df: pd.DataFrame) -> pd.DataFrame:
+    """Build a one-row-per-trade book by pairing entry/exit event rows.
+
+    The event log (`trade_df`) intentionally has entry-only and exit-only columns.
+    This helper merges both sides into a denormalized trade book so key fields are
+    populated on a single row for each trade lifecycle.
+    """
+    if trade_df is None or trade_df.empty:
+        return pd.DataFrame()
+    if not {"action", "date", "ticker"}.issubset(trade_df.columns):
+        return pd.DataFrame()
+
+    work = trade_df.copy()
+    work["date"] = pd.to_datetime(work["date"], errors="coerce")
+
+    entries = (
+        work[work["action"] == "enter"]
+        .sort_values(["ticker", "date"], kind="stable")
+        .copy()
+    )
+    exits = (
+        work[work["action"] == "exit"]
+        .sort_values(["ticker", "date"], kind="stable")
+        .copy()
+    )
+
+    entries["trade_seq"] = entries.groupby("ticker", sort=False).cumcount()
+    exits["trade_seq"] = exits.groupby("ticker", sort=False).cumcount()
+
+    entry_rename = {
+        "date": "entry_date",
+        "option_price": "entry_option_price",
+        "stock_price": "entry_stock_price",
+        "delta": "entry_delta",
+        "delta_raw": "entry_delta_raw",
+        "stock_position": "entry_stock_position",
+        "dte": "entry_dte",
+    }
+    exit_rename = {
+        "date": "exit_date",
+        "option_price": "exit_option_price",
+        "stock_price": "exit_stock_price",
+    }
+
+    e = entries.rename(columns=entry_rename)
+    x = exits.rename(columns=exit_rename)
+
+    keep_e = [
+        "ticker", "trade_seq", "signal_date", "entry_date", "entry_option_price",
+        "entry_stock_price", "entry_delta", "entry_delta_raw", "signal_side",
+        "option_qty", "entry_stock_position", "num_contracts", "strike", "expiry",
+        "entry_dte", "entry_cost", "rank", "prediction", "target_weight",
+        "target_delta_exposure", "per_contract_delta_exposure",
+    ]
+    keep_x = [
+        "ticker", "trade_seq", "exit_date", "exit_option_price", "exit_stock_price",
+        "exit_reason", "days_held", "bars_held", "realized_pnl", "exit_cost",
+        "signal_side", "option_qty", "num_contracts",
+    ]
+    e = e[[c for c in keep_e if c in e.columns]]
+    x = x[[c for c in keep_x if c in x.columns]]
+
+    merged = e.merge(x, on=["ticker", "trade_seq"], how="outer", suffixes=("", "_exit"))
+
+    # Fill side/size fields from whichever side is available.
+    for base in ["signal_side", "option_qty", "num_contracts"]:
+        alt = f"{base}_exit"
+        if base in merged.columns and alt in merged.columns:
+            merged[base] = merged[base].combine_first(merged[alt])
+            merged = merged.drop(columns=[alt])
+
+    def _col(df: pd.DataFrame, name: str, fill=np.nan) -> pd.Series:
+        if name in df.columns:
+            return df[name]
+        return pd.Series(fill, index=df.index)
+
+    merged["action"] = "round_trip"
+    merged["date"] = _col(merged, "entry_date", pd.NaT).combine_first(_col(merged, "exit_date", pd.NaT))
+    merged["option_price"] = _col(merged, "entry_option_price").combine_first(_col(merged, "exit_option_price"))
+    merged["stock_price"] = _col(merged, "entry_stock_price").combine_first(_col(merged, "exit_stock_price"))
+    merged["delta"] = _col(merged, "entry_delta")
+    merged["delta_raw"] = _col(merged, "entry_delta_raw")
+    merged["stock_position"] = _col(merged, "entry_stock_position")
+    merged["dte"] = _col(merged, "entry_dte")
+
+    # Keep target fields populated in fixed-size mode.
+    entry_price = pd.to_numeric(_col(merged, "entry_stock_price"), errors="coerce")
+    entry_delta_raw = pd.to_numeric(_col(merged, "entry_delta_raw"), errors="coerce")
+    contracts = pd.to_numeric(_col(merged, "num_contracts"), errors="coerce").abs()
+    per_contract = (entry_delta_raw.abs() * CONTRACT_SIZE * entry_price.abs())
+    actual_delta_exposure = per_contract * contracts
+
+    merged["per_contract_delta_exposure"] = pd.to_numeric(
+        _col(merged, "per_contract_delta_exposure"), errors="coerce"
+    ).combine_first(per_contract)
+    merged["target_delta_exposure"] = pd.to_numeric(
+        _col(merged, "target_delta_exposure"), errors="coerce"
+    ).combine_first(actual_delta_exposure)
+    merged["target_weight"] = pd.to_numeric(
+        _col(merged, "target_weight"), errors="coerce"
+    ).fillna(0.0)
+
+    has_entry = _col(merged, "entry_date", pd.NaT).notna()
+    has_exit = _col(merged, "exit_date", pd.NaT).notna()
+    merged["trade_status"] = np.where(has_entry & has_exit, "closed", np.where(has_entry, "open", "orphan_exit"))
+
+    core_cols = [
+        "action", "date", "ticker", "signal_date", "option_price", "stock_price",
+        "delta", "delta_raw", "signal_side", "option_qty", "stock_position",
+        "num_contracts", "strike", "expiry", "dte", "entry_cost", "rank",
+        "prediction", "target_weight", "target_delta_exposure",
+        "per_contract_delta_exposure", "exit_reason", "days_held", "bars_held",
+        "realized_pnl", "exit_cost",
+    ]
+    extra_cols = [
+        "trade_status", "trade_seq", "entry_date", "exit_date",
+        "entry_option_price", "exit_option_price", "entry_stock_price", "exit_stock_price",
+    ]
+    ordered = [c for c in core_cols + extra_cols if c in merged.columns]
+    merged = merged[ordered].sort_values(["date", "ticker", "trade_seq"], kind="stable")
+    merged = merged.reset_index(drop=True)
+    return merged
+
+
 # ---------------------------------------------------------------------------
 # Position schema (dict keys)
 # ---------------------------------------------------------------------------
@@ -70,6 +300,9 @@ def _f(val, default: float = float("nan")) -> float:
 # prev_option_price  : float  — updated each day
 # prev_stock_price   : float  — updated each day
 # current_delta      : float  — updated each day
+# raw_delta          : float  — option delta from data (unsigned call delta)
+# signal_side        : int    — +1 long option, -1 short option
+# option_qty         : int    — signed contracts (+long / -short)
 # stock_position     : float  — shares short (negative), updated on rebalance
 # num_contracts      : int
 # expiry             : pd.Timestamp
@@ -226,6 +459,17 @@ def run_backtest(
     earnings_cycle_mode: bool | None = None,
     entry_prediction_threshold: float | None = None,
     stop_loss_frac_of_entry_cost: float | None = None,
+    allow_short_signals: bool = False,
+    signal_side_col: str = "signal_side",
+    sizing_mode: str = "fixed",
+    risk_target_gross_exposure_frac: float = 0.10,
+    risk_target_daily_vol: float | None = None,
+    risk_max_name_exposure_frac: float | None = 0.05,
+    risk_use_vol_scaling: bool = True,
+    risk_vol_lookback_days: int = 21,
+    risk_vol_floor: float = 0.01,
+    risk_max_option_oi_frac: float | None = 0.01,
+    risk_max_contracts_per_trade: int | None = None,
 ) -> dict[str, Any]:
     """Run the full delta-hedged options backtest.
 
@@ -254,10 +498,34 @@ def run_backtest(
                          If None, auto-enables when top_k_df includes
                          ``entry_date_hint``.
     entry_prediction_threshold : If set, only enter signals where
-                                 prediction >= threshold.
+                                 prediction >= threshold (long-only mode) or
+                                 abs(prediction) >= threshold (when shorts enabled).
     stop_loss_frac_of_entry_cost : If set (e.g., 0.20), exit a position early
                                    when cumulative mark-to-market P&L falls below
                                    -threshold * entry_cost.
+    allow_short_signals : If True, support signed long/short signals in
+                          ``top_k_df`` via ``signal_side_col`` (+1 long, -1 short).
+                          Shorts are implemented as short calls plus delta hedge.
+    signal_side_col : Column name in signal table holding signal side.
+    sizing_mode : ``"fixed"`` uses scalar ``num_contracts`` for every trade.
+                  ``"risk"`` sizes each trade from cross-sectional signal weights,
+                  optional inverse-vol scaling, and option delta-equivalent exposure.
+    risk_target_gross_exposure_frac : Target gross delta-equivalent exposure as a
+                                      fraction of current equity when
+                                      ``sizing_mode="risk"``.
+    risk_target_daily_vol : Optional target daily portfolio volatility
+                            (e.g., 0.01 for 1%). Uses a diagonal approximation
+                            from ticker-level realized vols. If provided, the
+                            gross target is derived from this risk budget.
+    risk_max_name_exposure_frac : Optional per-ticker cap (fraction of equity) in
+                                  risk sizing mode.
+    risk_use_vol_scaling : If True, scale signal scores by inverse realized vol.
+    risk_vol_lookback_days : Lookback window for daily realized vol estimate.
+    risk_vol_floor : Minimum daily vol used in inverse-vol scaling to avoid
+                     unstable leverage.
+    risk_max_option_oi_frac : Optional liquidity cap as fraction of option open
+                              interest allowed per trade.
+    risk_max_contracts_per_trade : Optional hard cap on contracts per trade.
 
     Returns
     -------
@@ -265,6 +533,7 @@ def run_backtest(
         equity_curve   : pd.Series — daily cumulative equity
         daily_pnl_df   : pd.DataFrame — daily P&L log
         trade_log      : pd.DataFrame — entry/exit records
+        trade_book     : pd.DataFrame — one-row-per-trade round-trip book
         position_log   : pd.DataFrame — daily position snapshots
         metrics        : dict — performance metrics
         drawdown       : pd.Series
@@ -282,12 +551,84 @@ def run_backtest(
         ranked = top_k_df.copy()
         ranked["date"] = pd.to_datetime(ranked["date"], errors="coerce")
     else:
-        ranked = build_signal_table(predictions_df, K=K)
+        if allow_short_signals:
+            ranked_all = predictions_df.copy()
+            ranked_all["date"] = pd.to_datetime(ranked_all["date"], errors="coerce")
+            ranked_all = ranked_all.dropna(subset=["date", "ticker", "prediction"]).copy()
+            ranked_all["prediction"] = pd.to_numeric(ranked_all["prediction"], errors="coerce")
+            ranked_all = ranked_all.dropna(subset=["prediction"]).copy()
+            ranked_all["rank"] = (
+                ranked_all.groupby("date")["prediction"]
+                .rank(method="first", ascending=False)
+                .astype(int)
+            )
+            ranked_all["n_assets"] = ranked_all.groupby("date")["ticker"].transform("count").astype(int)
+            ranked_all["rank_from_bottom"] = (
+                ranked_all.groupby("date")["prediction"]
+                .rank(method="first", ascending=True)
+                .astype(int)
+            )
+
+            long_df = ranked_all[ranked_all["rank"] <= int(K)].copy()
+            long_df[signal_side_col] = 1
+            short_df = ranked_all[ranked_all["rank_from_bottom"] <= int(K)].copy()
+            short_df[signal_side_col] = -1
+            ranked = pd.concat([long_df, short_df], ignore_index=True)
+            ranked = ranked.drop_duplicates(subset=["date", "ticker"], keep="first")
+            ranked["K"] = int(K)
+            n_dates = ranked["date"].nunique() if not ranked.empty else 0
+            print(
+                "[ranking] long/short signal table: "
+                f"K_long={K}, K_short={K} | signal dates={n_dates} | "
+                f"rows={len(ranked)} | longs={(ranked[signal_side_col] > 0).sum()} | "
+                f"shorts={(ranked[signal_side_col] < 0).sum()}"
+            )
+        else:
+            ranked = build_signal_table(predictions_df, K=K)
     if ranked.empty:
         raise ValueError("[backtest] No ranked signals produced — check predictions input.")
 
+    if signal_side_col in ranked.columns:
+        ranked[signal_side_col] = pd.to_numeric(ranked[signal_side_col], errors="coerce").fillna(0.0)
+        ranked[signal_side_col] = np.sign(ranked[signal_side_col]).replace(0.0, 1.0).astype(int)
+    else:
+        ranked[signal_side_col] = 1
+    if not allow_short_signals:
+        ranked[signal_side_col] = 1
+
     if earnings_cycle_mode is None:
         earnings_cycle_mode = bool(top_k_df is not None and "entry_date_hint" in ranked.columns)
+
+    sizing_mode = str(sizing_mode).strip().lower()
+    if sizing_mode not in {"fixed", "risk"}:
+        raise ValueError(f"[backtest] sizing_mode must be 'fixed' or 'risk' (got: {sizing_mode!r})")
+    num_contracts = max(1, int(num_contracts))
+
+    risk_target_gross_exposure_frac = max(0.0, float(risk_target_gross_exposure_frac))
+    if risk_target_daily_vol is not None:
+        risk_target_daily_vol = max(0.0, float(risk_target_daily_vol))
+    if risk_max_name_exposure_frac is not None:
+        risk_max_name_exposure_frac = max(0.0, float(risk_max_name_exposure_frac))
+    if risk_max_option_oi_frac is not None:
+        risk_max_option_oi_frac = max(0.0, float(risk_max_option_oi_frac))
+    if risk_max_contracts_per_trade is not None:
+        risk_max_contracts_per_trade = max(1, int(risk_max_contracts_per_trade))
+    risk_vol_floor = max(float(risk_vol_floor), 1e-6)
+    risk_vol_lookback_days = max(2, int(risk_vol_lookback_days))
+
+    vol_lookup: dict[tuple[pd.Timestamp, str], float] = {}
+    if sizing_mode == "risk":
+        vol_lookup = _build_underlying_vol_lookup(
+            options_df=options_df,
+            lookback_days=risk_vol_lookback_days,
+        )
+        print(
+            f"[backtest] risk sizing enabled: gross_target={risk_target_gross_exposure_frac:.1%}, "
+            f"daily_vol_target={risk_target_daily_vol if risk_target_daily_vol is not None else 'None'}, "
+            f"max_name={risk_max_name_exposure_frac if risk_max_name_exposure_frac is not None else 'None'}, "
+            f"vol_scaling={risk_use_vol_scaling}, shorts={allow_short_signals}, vol_points={len(vol_lookup):,}",
+            flush=True,
+        )
 
     ticker_signal_dates: dict[str, list[pd.Timestamp]] = {}
     next_allowed_signal_date: dict[str, pd.Timestamp | None] = {}
@@ -367,6 +708,7 @@ def run_backtest(
     daily_rows: list[dict] = []
     trade_log: list[dict] = []
     position_snapshots: list[dict] = []
+    running_equity = float(initial_capital)
 
     # Iterate over all dates in the union of prediction + option dates
     all_dates = sorted(set(all_pred_dates) | set(all_option_dates))
@@ -426,11 +768,15 @@ def run_backtest(
 
             entry_opt_price = _f(opt_row["mid_price"])
             entry_stock_price = _f(opt_row["underlying_price"])
-            entry_delta = _f(opt_row["delta"])
+            entry_delta_raw = _f(opt_row["delta"])
             expiry = pd.Timestamp(opt_row["exdate"])
             dte_entry = int(opt_row["dte"])
             strike = _f(opt_row["strike_price"])
-            stock_pos = initial_stock_position(entry_delta, num_contracts)
+            position_num_contracts = max(1, int(queued.get("num_contracts", num_contracts)))
+            option_side = int(np.sign(queued.get("signal_side", 1)) or 1)
+            option_qty = int(option_side * position_num_contracts)
+            effective_delta = float(entry_delta_raw) * float(option_side)
+            stock_pos = initial_stock_position(effective_delta, position_num_contracts)
 
             open_positions[ticker] = {
                 "ticker": ticker,
@@ -440,9 +786,12 @@ def run_backtest(
                 "entry_stock_price": entry_stock_price,
                 "prev_option_price": entry_opt_price,
                 "prev_stock_price": entry_stock_price,
-                "current_delta": entry_delta,
+                "current_delta": effective_delta,
+                "raw_delta": entry_delta_raw,
+                "signal_side": option_side,
+                "option_qty": option_qty,
                 "stock_position": stock_pos,
-                "num_contracts": num_contracts,
+                "num_contracts": position_num_contracts,
                 "expiry": expiry,
                 "strike": strike,
                 "dte_at_entry": dte_entry,
@@ -452,8 +801,8 @@ def run_backtest(
             }
 
             entry_cost = (
-                entry_opt_price * CONTRACT_SIZE * num_contracts
-                + commission_per_contract * num_contracts
+                entry_opt_price * CONTRACT_SIZE * abs(option_qty)
+                + commission_per_contract * abs(option_qty)
             )
             stop_loss_pnl_threshold = (
                 -abs(float(stop_loss_frac_of_entry_cost)) * entry_cost
@@ -469,14 +818,21 @@ def run_backtest(
                 "signal_date": queued["signal_date"],
                 "option_price": entry_opt_price,
                 "stock_price": entry_stock_price,
-                "delta": entry_delta,
+                "delta": effective_delta,
+                "delta_raw": entry_delta_raw,
+                "signal_side": option_side,
+                "option_qty": option_qty,
                 "stock_position": stock_pos,
+                "num_contracts": position_num_contracts,
                 "strike": strike,
                 "expiry": expiry,
                 "dte": dte_entry,
                 "entry_cost": entry_cost,
                 "rank": queued.get("rank"),
                 "prediction": queued.get("prediction"),
+                "target_weight": queued.get("target_weight"),
+                "target_delta_exposure": queued.get("target_delta_exposure"),
+                "per_contract_delta_exposure": queued.get("per_contract_delta_exposure"),
             })
 
         entry_queue = remaining_queue
@@ -486,6 +842,12 @@ def run_backtest(
         # ================================================================
         today_signals = ranked[ranked["date"] == current_ts]
         today_top_k_tickers = set(today_signals["ticker"].tolist()) if not today_signals.empty else set()
+        today_signal_sides: dict[str, set[int]] = {}
+        if not today_signals.empty:
+            for row in today_signals.itertuples(index=False):
+                _t = str(getattr(row, "ticker"))
+                _s = int(np.sign(getattr(row, signal_side_col, 1)) or 1)
+                today_signal_sides.setdefault(_t, set()).add(_s)
 
         # ================================================================
         # Step 3: Update open positions — rebalance, P&L, exit checks
@@ -509,7 +871,16 @@ def run_backtest(
                     positions_to_exit.append(
                         (ticker, EXIT_REASON_HPR, pos["prev_option_price"], pos["prev_stock_price"])
                     )
-                elif (not earnings_cycle_mode) and use_signal_exit and ticker not in today_top_k_tickers and not today_signals.empty:
+                elif (
+                    (not earnings_cycle_mode)
+                    and use_signal_exit
+                    and not today_signals.empty
+                    and (
+                        ticker not in today_top_k_tickers
+                        or int(np.sign(pos.get("signal_side", 1)) or 1)
+                        not in today_signal_sides.get(ticker, set())
+                    )
+                ):
                     positions_to_exit.append(
                         (ticker, EXIT_REASON_SIGNAL, pos["prev_option_price"], pos["prev_stock_price"])
                     )
@@ -517,7 +888,8 @@ def run_backtest(
 
             curr_opt_price = _f(opt_row["mid_price"])
             curr_stock_price = _f(opt_row["underlying_price"])
-            curr_delta = _f(opt_row["delta"])
+            curr_delta_raw = _f(opt_row["delta"])
+            curr_delta = float(curr_delta_raw) * float(pos.get("signal_side", 1))
             curr_dte = int(opt_row.get("dte", 999))
 
             adj_shares = hedge_adjustment(
@@ -530,7 +902,7 @@ def run_backtest(
                 stock_price_prev=pos["prev_stock_price"],
                 stock_price_curr=curr_stock_price,
                 stock_position=pos["stock_position"],
-                num_contracts=pos["num_contracts"],
+                num_contracts=pos.get("option_qty", pos["num_contracts"]),
                 hedge_adjustment_shares=adj_shares,
                 half_spread_pct_stock=half_spread_pct_stock,
             )
@@ -542,6 +914,7 @@ def run_backtest(
             )
             open_positions[ticker]["prev_option_price"] = curr_opt_price
             open_positions[ticker]["prev_stock_price"] = curr_stock_price
+            open_positions[ticker]["raw_delta"] = curr_delta_raw
             open_positions[ticker]["days_held"] += 1
 
             position_snapshots.append({
@@ -550,6 +923,10 @@ def run_backtest(
                 "option_price": curr_opt_price,
                 "stock_price": curr_stock_price,
                 "delta": curr_delta,
+                "delta_raw": curr_delta_raw,
+                "signal_side": open_positions[ticker].get("signal_side", 1),
+                "option_qty": open_positions[ticker].get("option_qty", open_positions[ticker]["num_contracts"]),
+                "num_contracts": open_positions[ticker]["num_contracts"],
                 "stock_position": open_positions[ticker]["stock_position"],
                 "dte": curr_dte,
                 "days_held": open_positions[ticker]["days_held"],
@@ -571,7 +948,15 @@ def run_backtest(
             else:
                 if curr_dte < exit_dte_threshold:
                     exit_reason = EXIT_REASON_DTE
-                elif use_signal_exit and ticker not in today_top_k_tickers and not today_signals.empty:
+                elif (
+                    use_signal_exit
+                    and not today_signals.empty
+                    and (
+                        ticker not in today_top_k_tickers
+                        or int(np.sign(pos.get("signal_side", 1)) or 1)
+                        not in today_signal_sides.get(ticker, set())
+                    )
+                ):
                     exit_reason = EXIT_REASON_SIGNAL
                 elif open_positions[ticker]["days_held"] >= max_holding_days:
                     exit_reason = EXIT_REASON_HPR
@@ -595,7 +980,7 @@ def run_backtest(
                 entry_stock_price=pos["entry_stock_price"],
                 exit_stock_price=exit_stock_price,
                 stock_position=pos["stock_position"],
-                num_contracts=pos["num_contracts"],
+                num_contracts=pos.get("option_qty", pos["num_contracts"]),
                 commission_per_contract=commission_per_contract,
                 half_spread_pct_option=half_spread_pct_option,
                 half_spread_pct_stock=half_spread_pct_stock,
@@ -607,6 +992,9 @@ def run_backtest(
                 "exit_reason": reason,
                 "option_price": exit_opt_price,
                 "stock_price": exit_stock_price,
+                "signal_side": pos.get("signal_side", 1),
+                "option_qty": pos.get("option_qty", pos["num_contracts"]),
+                "num_contracts": pos["num_contracts"],
                 "days_held": pos["days_held"],
                 "bars_held": pos["days_held"],
                 "realized_pnl": ep["total_pnl"],
@@ -623,14 +1011,19 @@ def run_backtest(
         if can_queue_today:
             next_opt_date = pred_to_next_opt.get(current_ts)
             if next_opt_date is not None:
+                candidate_entries: list[dict[str, Any]] = []
                 for _, sig_row in today_signals.iterrows():
                     ticker = str(sig_row["ticker"])
                     if ticker in open_positions:
                         continue
 
                     pred_val = float(sig_row.get("prediction", np.nan))
+                    signal_side = int(np.sign(sig_row.get(signal_side_col, 1)) or 1)
+                    if not allow_short_signals:
+                        signal_side = 1
                     if entry_prediction_threshold is not None:
-                        if pd.isna(pred_val) or pred_val < float(entry_prediction_threshold):
+                        thr_probe = abs(pred_val) if allow_short_signals else pred_val
+                        if pd.isna(thr_probe) or thr_probe < float(entry_prediction_threshold):
                             continue
 
                     if earnings_cycle_mode:
@@ -651,16 +1044,111 @@ def run_backtest(
                         max_spread_frac=entry_max_spread_frac,
                         _opt_lookup=_opt_lookup,
                     )
-                    entry_queue.append({
-                        "signal_date": current_ts,
-                        "entry_date": pd.Timestamp(next_opt_date),
+                    if opt_row is None:
+                        continue
+
+                    candidate_entries.append({
+                        "sig_row": sig_row,
                         "ticker": ticker,
-                        "rank": int(sig_row.get("rank", 0)),
                         "prediction": pred_val,
-                        "expiry": pd.Timestamp(opt_row["exdate"])
-                        if opt_row is not None
-                        else None,
+                        "signal_side": signal_side,
+                        "opt_row": opt_row,
                     })
+
+                if candidate_entries:
+                    equity_for_sizing = max(running_equity + daily_portfolio_pnl, 0.0)
+                    signal_weights: dict[str, float] = {}
+                    gross_target_dollars = float("nan")
+                    if sizing_mode == "risk":
+                        candidate_df = pd.DataFrame(
+                            [
+                                {
+                                    "ticker": c["ticker"],
+                                    "prediction": c["prediction"],
+                                    signal_side_col: c["signal_side"],
+                                }
+                                for c in candidate_entries
+                            ]
+                        )
+                        signal_weights = _compute_signal_weights(
+                            candidate_df,
+                            signal_date=current_ts,
+                            allow_shorts=allow_short_signals,
+                            side_col=signal_side_col,
+                            use_vol_scaling=risk_use_vol_scaling,
+                            vol_lookup=vol_lookup,
+                            vol_floor=risk_vol_floor,
+                        )
+                        gross_target_dollars = equity_for_sizing * risk_target_gross_exposure_frac
+                        if risk_target_daily_vol is not None and risk_target_daily_vol > 0.0:
+                            weighted_var = 0.0
+                            for t, w in signal_weights.items():
+                                sigma = vol_lookup.get((pd.Timestamp(current_ts), str(t)), np.nan)
+                                if not np.isfinite(sigma) or sigma <= 0.0:
+                                    sigma = risk_vol_floor
+                                weighted_var += (abs(float(w)) * float(sigma)) ** 2
+                            unit_portfolio_vol = float(np.sqrt(weighted_var))
+                            if np.isfinite(unit_portfolio_vol) and unit_portfolio_vol > 0.0:
+                                gross_from_risk = (
+                                    equity_for_sizing * float(risk_target_daily_vol) / unit_portfolio_vol
+                                )
+                                if risk_target_gross_exposure_frac > 0.0:
+                                    gross_target_dollars = min(gross_target_dollars, gross_from_risk)
+                                else:
+                                    gross_target_dollars = gross_from_risk
+
+                    for cand in candidate_entries:
+                        sig_row = cand["sig_row"]
+                        ticker = cand["ticker"]
+                        pred_val = cand["prediction"]
+                        signal_side = int(np.sign(cand.get("signal_side", 1)) or 1)
+                        opt_row = cand["opt_row"]
+
+                        entry_contracts = int(num_contracts)
+                        target_weight = np.nan
+                        target_delta_exposure = np.nan
+                        per_contract_delta_exposure = np.nan
+
+                        if sizing_mode == "risk":
+                            target_weight = float(signal_weights.get(ticker, 0.0))
+                            target_delta_exposure = abs(target_weight) * gross_target_dollars
+                            if risk_max_name_exposure_frac is not None:
+                                target_delta_exposure = min(
+                                    target_delta_exposure,
+                                    float(risk_max_name_exposure_frac) * equity_for_sizing,
+                                )
+
+                            entry_contracts, per_contract_delta_exposure = _contracts_for_target_delta_exposure(
+                                target_delta_exposure=target_delta_exposure,
+                                option_delta=_f(opt_row.get("delta")),
+                                underlying_price=_f(opt_row.get("underlying_price")),
+                            )
+
+                            if risk_max_option_oi_frac is not None:
+                                oi = _f(opt_row.get("open_interest"))
+                                if np.isfinite(oi) and oi > 0:
+                                    liq_cap = int(np.floor(float(oi) * float(risk_max_option_oi_frac)))
+                                    entry_contracts = min(entry_contracts, max(liq_cap, 0))
+
+                            if risk_max_contracts_per_trade is not None:
+                                entry_contracts = min(entry_contracts, int(risk_max_contracts_per_trade))
+
+                            if entry_contracts < 1:
+                                continue
+
+                        entry_queue.append({
+                            "signal_date": current_ts,
+                            "entry_date": pd.Timestamp(next_opt_date),
+                            "ticker": ticker,
+                            "rank": int(sig_row.get("rank", 0)),
+                            "prediction": pred_val,
+                            "signal_side": signal_side,
+                            "expiry": pd.Timestamp(opt_row["exdate"]),
+                            "num_contracts": int(entry_contracts),
+                            "target_weight": target_weight,
+                            "target_delta_exposure": target_delta_exposure,
+                            "per_contract_delta_exposure": per_contract_delta_exposure,
+                        })
 
         # ================================================================
         # Step 5: Record daily portfolio state
@@ -668,9 +1156,11 @@ def run_backtest(
         daily_rows.append({
             "date": current_ts,
             "daily_pnl": daily_portfolio_pnl,
+            "equity": running_equity + daily_portfolio_pnl,
             "n_open_positions": len(open_positions),
             "open_tickers": sorted(open_positions.keys()),
         })
+        running_equity = max(0.0, running_equity + daily_portfolio_pnl)
 
     print(
         f"[backtest] Loop complete. Dates processed: {len(all_dates):,}  "
@@ -682,6 +1172,7 @@ def run_backtest(
     # --- Post-processing ---
     daily_df = pd.DataFrame(daily_rows).set_index("date")
     trade_df = pd.DataFrame(trade_log) if trade_log else pd.DataFrame()
+    trade_book_df = _build_round_trip_trade_book(trade_df)
     snapshot_df = pd.DataFrame(position_snapshots) if position_snapshots else pd.DataFrame()
 
     eq = equity_curve(daily_df["daily_pnl"], initial_capital)
@@ -713,6 +1204,7 @@ def run_backtest(
         "equity_curve": eq,
         "daily_pnl_df": daily_df,
         "trade_log": trade_df,
+        "trade_book": trade_book_df,
         "position_log": snapshot_df,
         "metrics": metrics,
         "drawdown": dd,
@@ -803,6 +1295,17 @@ def optimize_backtest_grid(
     half_spread_pct_option: float = 0.02,
     use_signal_exit: bool = False,
     earnings_cycle_mode: bool | None = True,
+    allow_short_signals: bool = False,
+    signal_side_col: str = "signal_side",
+    sizing_mode: str = "fixed",
+    risk_target_gross_exposure_frac: float = 0.10,
+    risk_target_daily_vol: float | None = None,
+    risk_max_name_exposure_frac: float | None = 0.05,
+    risk_use_vol_scaling: bool = True,
+    risk_vol_lookback_days: int = 21,
+    risk_vol_floor: float = 0.01,
+    risk_max_option_oi_frac: float | None = 0.01,
+    risk_max_contracts_per_trade: int | None = None,
     drawdown_penalty: float = 0.25,
     suppress_run_output: bool = True,
 ) -> pd.DataFrame:
@@ -879,6 +1382,17 @@ def optimize_backtest_grid(
                     earnings_cycle_mode=earnings_cycle_mode,
                     entry_prediction_threshold=entry_threshold,
                     stop_loss_frac_of_entry_cost=stop_loss_frac,
+                    allow_short_signals=allow_short_signals,
+                    signal_side_col=signal_side_col,
+                    sizing_mode=sizing_mode,
+                    risk_target_gross_exposure_frac=risk_target_gross_exposure_frac,
+                    risk_target_daily_vol=risk_target_daily_vol,
+                    risk_max_name_exposure_frac=risk_max_name_exposure_frac,
+                    risk_use_vol_scaling=risk_use_vol_scaling,
+                    risk_vol_lookback_days=risk_vol_lookback_days,
+                    risk_vol_floor=risk_vol_floor,
+                    risk_max_option_oi_frac=risk_max_option_oi_frac,
+                    risk_max_contracts_per_trade=risk_max_contracts_per_trade,
                 )
         else:
             res = run_backtest(
@@ -903,6 +1417,17 @@ def optimize_backtest_grid(
                 earnings_cycle_mode=earnings_cycle_mode,
                 entry_prediction_threshold=entry_threshold,
                 stop_loss_frac_of_entry_cost=stop_loss_frac,
+                allow_short_signals=allow_short_signals,
+                signal_side_col=signal_side_col,
+                sizing_mode=sizing_mode,
+                risk_target_gross_exposure_frac=risk_target_gross_exposure_frac,
+                risk_target_daily_vol=risk_target_daily_vol,
+                risk_max_name_exposure_frac=risk_max_name_exposure_frac,
+                risk_use_vol_scaling=risk_use_vol_scaling,
+                risk_vol_lookback_days=risk_vol_lookback_days,
+                risk_vol_floor=risk_vol_floor,
+                risk_max_option_oi_frac=risk_max_option_oi_frac,
+                risk_max_contracts_per_trade=risk_max_contracts_per_trade,
             )
 
         metrics = res["metrics"]

@@ -96,7 +96,7 @@ def build_entry_table(
     Returns
     -------
     DataFrame with one row per tradeable entry signal. Columns:
-    signal_date, entry_date, ticker, rank, prediction,
+    signal_date, entry_date, ticker, rank, rank_from_bottom, signal_side, prediction,
     option_mid_entry, delta_entry, gamma_entry, vega_entry,
     strike, expiry, dte_entry, underlying_entry, implied_vol_entry,
     open_interest_entry.
@@ -139,6 +139,10 @@ def build_entry_table(
                 "entry_date": pd.Timestamp(entry_date),
                 "ticker": ticker,
                 "rank": int(row.get("rank", 0)),
+                "rank_from_bottom": int(row.get("rank_from_bottom", 0))
+                if pd.notna(row.get("rank_from_bottom", np.nan))
+                else np.nan,
+                "signal_side": int(np.sign(row.get("signal_side", 1)) or 1),
                 "prediction": _f(row.get("prediction", np.nan)),
                 "option_mid_entry": _f(opt["mid_price"]),
                 "delta_entry": _f(opt["delta"]),

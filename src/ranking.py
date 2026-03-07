@@ -96,6 +96,12 @@ def build_earnings_signals(
     predictions_df: pd.DataFrame,
     feature_panel_df: pd.DataFrame,
     K: int = 3,
+    include_short: bool = False,
+    short_k: int | None = None,
+    rank_pool_k: int | None = None,
+    ranking_group: str = "entry_date",
+    period_freq: str = "Q",
+    side_col: str = "signal_side",
     date_col: str = "date",
     pred_col: str = "prediction",
     ticker_col: str = "ticker",
@@ -108,19 +114,32 @@ def build_earnings_signals(
       - `date` col is set to signal_date so build_entry_table finds
         the next option date (= earnings day) as the actual entry
       - Stocks are ranked cross-sectionally among those sharing the same
-        announcement date; top-K are selected.
+        announcement date.
+      - By default, top-K are selected as long signals.
+      - If ``include_short=True``, bottom-``short_k`` are also selected as
+        short signals.
 
     Parameters
     ----------
     predictions_df   : LSTM predictions with columns [date, ticker, prediction].
     feature_panel_df : Feature panel with columns [ticker, feature_available_date].
-    K                : Number of top stocks to select per earnings date.
+    K                : Number of top stocks to select per earnings date (longs).
+    include_short    : Include bottom-ranked names as short signals.
+    short_k          : Number of short names per earnings date. Defaults to ``K``.
+    rank_pool_k      : Optional pre-filter size on the long side before selecting
+                       longs/shorts. Example: ``rank_pool_k=30`` then long top-6
+                       and short bottom-6 of that top-30 pool.
+    ranking_group    : Ranking scope:
+                       - ``"entry_date"`` (default): rank within exact announcement date
+                       - ``"earnings_period"``: rank within period (``period_freq``)
+    period_freq      : Pandas period frequency when ``ranking_group="earnings_period"``.
+    side_col         : Output column name for signal side (+1 long, -1 short).
     earnings_col     : Column in feature_panel_df containing announcement dates.
 
     Returns
     -------
     DataFrame with columns: date (signal_date), entry_date_hint, ticker,
-    prediction, rank, n_assets, K.
+    prediction, rank, n_assets, K, and optionally ``side_col``.
     """
     predictions_df = predictions_df.copy()
     predictions_df[date_col] = pd.to_datetime(predictions_df[date_col], errors="coerce")
@@ -188,25 +207,98 @@ def build_earnings_signals(
 
     signals_df = pd.DataFrame(records)
 
-    # Cross-sectional rank within each announcement date group
+    ranking_group_key = str(ranking_group).strip().lower()
+    if ranking_group_key not in {"entry_date", "earnings_period"}:
+        raise ValueError(
+            f"[ranking] ranking_group must be 'entry_date' or 'earnings_period' "
+            f"(got: {ranking_group!r})."
+        )
+
+    if ranking_group_key == "entry_date":
+        group_col = "entry_date_hint"
+    else:
+        signals_df["earnings_period"] = (
+            pd.to_datetime(signals_df["entry_date_hint"], errors="coerce")
+            .dt.to_period(period_freq)
+            .astype(str)
+        )
+        group_col = "earnings_period"
+
+    # Cross-sectional rank within configured group
     signals_df["rank"] = (
-        signals_df.groupby("entry_date_hint")[pred_col]
+        signals_df.groupby(group_col)[pred_col]
         .rank(method="first", ascending=False)
         .astype(int)
     )
     signals_df["n_assets"] = (
-        signals_df.groupby("entry_date_hint")[ticker_col]
+        signals_df.groupby(group_col)[ticker_col]
         .transform("count")
         .astype(int)
     )
 
-    # Keep top-K per announcement date
-    top_k = signals_df[signals_df["rank"] <= K].copy()
-    top_k["K"] = K
+    # Optional long-side pool filter (e.g., top-30 first).
+    pool_df = signals_df.copy()
+    if rank_pool_k is not None:
+        rank_pool_k = max(1, int(rank_pool_k))
+        pool_df = pool_df[pool_df["rank"] <= rank_pool_k].copy()
+        pool_df["pool_size"] = (
+            pool_df.groupby(group_col)[ticker_col]
+            .transform("count")
+            .astype(int)
+        )
+    else:
+        pool_df["pool_size"] = pool_df["n_assets"]
 
-    n_events = top_k["entry_date_hint"].nunique()
-    print(f"[ranking] earnings signals: K={K} | earnings events={n_events} | total rows={len(top_k)}")
-    return top_k.sort_values("date").reset_index(drop=True)
+    # Long leg: keep top-K per announcement date.
+    long_df = pool_df[pool_df["rank"] <= int(K)].copy()
+    long_df["K"] = int(K)
+    long_df[side_col] = 1
+
+    if not include_short:
+        n_events = long_df["entry_date_hint"].nunique()
+        print(
+            f"[ranking] earnings signals: K={K} | group={ranking_group_key} | "
+            f"pool={rank_pool_k if rank_pool_k is not None else 'ALL'} | "
+            f"earnings events={n_events} | total rows={len(long_df)}"
+        )
+        return long_df.sort_values("date").reset_index(drop=True)
+
+    # Short leg:
+    # - if rank_pool_k is set, use bottom-short_k of that top-side pool
+    # - else use bottom-short_k of the full group (legacy behavior)
+    short_k_eff = int(K if short_k is None else short_k)
+    short_k_eff = max(1, short_k_eff)
+    if rank_pool_k is not None:
+        # Bottom of the pool corresponds to highest rank values within pool.
+        cutoff = (pool_df["pool_size"] - short_k_eff).clip(lower=0)
+        short_df = pool_df[pool_df["rank"] > cutoff].copy()
+        short_df["rank_from_bottom"] = (
+            short_df.groupby(group_col)[pred_col]
+            .rank(method="first", ascending=True)
+            .astype(int)
+        )
+    else:
+        signals_df["rank_from_bottom"] = (
+            signals_df.groupby(group_col)[pred_col]
+            .rank(method="first", ascending=True)
+            .astype(int)
+        )
+        short_df = signals_df[signals_df["rank_from_bottom"] <= short_k_eff].copy()
+    short_df["K"] = int(K)
+    short_df[side_col] = -1
+
+    out = pd.concat([long_df, short_df], ignore_index=True)
+    out = out.drop_duplicates(subset=["date", "entry_date_hint", ticker_col], keep="first")
+
+    n_events = out["entry_date_hint"].nunique()
+    print(
+        "[ranking] earnings signals long/short: "
+        f"K_long={K}, K_short={short_k_eff} | group={ranking_group_key} | "
+        f"pool={rank_pool_k if rank_pool_k is not None else 'ALL'} | "
+        f"earnings events={n_events} | "
+        f"rows={len(out)} | longs={(out[side_col] > 0).sum()} | shorts={(out[side_col] < 0).sum()}"
+    )
+    return out.sort_values("date").reset_index(drop=True)
 
 
 def build_signal_table(

@@ -1,8 +1,8 @@
 # Stage 12 — P&L Computation
-# Daily mark-to-market P&L for delta-hedged call positions.
+# Daily mark-to-market P&L for delta-hedged option positions.
 #
 # Two P&L sources per position each day:
-#   1. Option price change:  (mid_t - mid_{t-1}) * CONTRACT_SIZE * num_contracts
+#   1. Option price change:  (mid_t - mid_{t-1}) * CONTRACT_SIZE * signed_contracts
 #   2. Stock hedge P&L:      stock_position * (S_t - S_{t-1})
 #      (stock_position is negative for short, so stock gains hurt)
 #
@@ -38,7 +38,7 @@ def daily_pnl(
     stock_price_prev : Underlying price at previous day's close.
     stock_price_curr : Underlying price at today's close.
     stock_position : Current short stock position (negative shares) BEFORE today's rebalance.
-    num_contracts : Contracts held.
+    num_contracts : Signed contracts held (+long / -short).
     hedge_adjustment_shares : Shares traded today for delta rebalance (from hedge.py).
     half_spread_pct_stock : Half bid-ask spread as fraction of stock price for rebalance cost.
 
@@ -78,7 +78,7 @@ def exit_pnl(
     entry_stock_price : Underlying at entry.
     exit_stock_price : Underlying at exit.
     stock_position : Final short stock position to cover (negative shares).
-    num_contracts : Contracts held.
+    num_contracts : Signed contracts held (+long / -short).
     commission_per_contract : Flat per-contract commission (both legs).
     half_spread_pct_option : Half option spread as fraction of option price.
     half_spread_pct_stock : Half stock spread as fraction of stock price.
@@ -89,11 +89,12 @@ def exit_pnl(
     """
     option_pnl = (exit_option_price - entry_option_price) * CONTRACT_SIZE * num_contracts
     stock_pnl = stock_position * (exit_stock_price - entry_stock_price)
+    contracts_abs = abs(float(num_contracts))
 
     # Closing costs: sell option (spread + commission) + cover short (spread)
     option_exit_cost = (
-        exit_option_price * half_spread_pct_option * CONTRACT_SIZE * num_contracts
-        + commission_per_contract * num_contracts
+        exit_option_price * half_spread_pct_option * CONTRACT_SIZE * contracts_abs
+        + commission_per_contract * contracts_abs
     )
     stock_exit_cost = abs(stock_position) * exit_stock_price * half_spread_pct_stock
     total_exit_cost = option_exit_cost + stock_exit_cost

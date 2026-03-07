@@ -1,10 +1,11 @@
 # Stage 10 — Delta Hedge
-# Each long call position is delta-hedged by shorting delta * CONTRACT_SIZE shares.
+# Each option position is delta-hedged by trading delta * CONTRACT_SIZE shares.
 # The hedge is rebalanced daily as delta drifts with the underlying price.
 # Net delta ≈ 0 isolates gamma/vega exposure rather than directional equity risk.
 #
 # Hedge mechanics:
-#   stock_position = -delta * CONTRACT_SIZE * num_contracts   (negative = short)
+#   stock_position = -effective_delta * CONTRACT_SIZE * num_contracts
+# where effective_delta is signed (+ for long call, - for short call).
 #   Daily adjustment = -(new_delta - old_delta) * CONTRACT_SIZE * num_contracts
 #
 # Convention: stock_position < 0 means short; adjustment < 0 means sell more shares.
@@ -16,11 +17,11 @@ CONTRACT_SIZE: int = 100
 
 
 def initial_stock_position(delta: float, num_contracts: int = 1) -> float:
-    """Compute the initial short stock position to delta-neutralize long calls.
+    """Compute initial stock position to delta-neutralize an option position.
 
     Parameters
     ----------
-    delta : Option delta at entry (e.g. 0.52 for near-ATM call).
+    delta : Signed effective delta at entry (e.g. +0.52 long call, -0.52 short call).
     num_contracts : Number of call contracts held long.
 
     Returns
