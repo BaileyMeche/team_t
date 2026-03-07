@@ -10,8 +10,7 @@ import numpy as np
 import pandas as pd
 from dotenv import load_dotenv
 import wrds
-
-
+import nasdaqdatalink 
 
 def configure_api_from_env(env_candidates: list[Path]) -> None:
     """Load API credentials from .env and configure Nasdaq Data Link.
